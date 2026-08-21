@@ -21,6 +21,22 @@ SUCCESS_PROBABILITIES: dict[str, list[float]] = {
     "possible_fraud": [],
 }
 
+# How long each action takes to resolve, in simulated minutes -- an immediate
+# retry resolves in the same request, a backoff retry waits before trying
+# again, and a customer nudge can take hours to act on. Used to derive a
+# meaningful resolved_at (failed_at + elapsed delay) instead of real
+# wall-clock time, since failed_at itself is a backdated synthetic timestamp.
+ACTION_RESOLUTION_DELAY_MINUTES: dict[str, float] = {
+    "retry_immediate": 1,
+    "retry_with_backoff": 20,
+    "suggest_alternate_method": 5,
+    "send_reminder": 240,
+}
+
+
+def resolution_delay_minutes(action: str) -> float:
+    return ACTION_RESOLUTION_DELAY_MINUTES.get(action, 0)
+
 
 def _deterministic_unit_interval(transaction_id: str, attempt_number: int) -> float:
     digest = hashlib.sha256(f"{transaction_id}:{attempt_number}".encode()).hexdigest()

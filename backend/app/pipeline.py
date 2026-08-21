@@ -6,7 +6,7 @@ attempts (0 for fraud), so this can never spin.
 """
 
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import timedelta
 
 from sqlalchemy.orm import Session
 
@@ -38,6 +38,12 @@ def run_transaction(db: Session, payment: FailedPayment) -> None:
         confidence=classification.confidence,
     )
 
+    # Simulated minutes elapsed since failed_at, accumulated as bounded actions
+    # are taken -- used to derive a meaningful resolved_at instead of real
+    # wall-clock time, since failed_at itself is a backdated synthetic
+    # timestamp (see executor.resolution_delay_minutes).
+    elapsed_minutes = 0.0
+
     while payment.status == "open":
         decision = decision_engine.decide(
             root_cause=classification.root_cause,
@@ -59,13 +65,14 @@ def run_transaction(db: Session, payment: FailedPayment) -> None:
         if decision.escalate:
             payment.status = "escalated"
             payment.final_action = "escalate_to_human"
-            payment.resolved_at = datetime.utcnow()
+            payment.resolved_at = payment.failed_at + timedelta(minutes=elapsed_minutes)
             db.commit()
             break
 
         attempt_number = payment.total_attempts + 1
         outcome = executor.execute(payment.transaction_id, classification.root_cause, attempt_number)
         payment.total_attempts = attempt_number
+        elapsed_minutes += executor.resolution_delay_minutes(decision.action)
 
         audit.log_event(
             db,
@@ -93,7 +100,7 @@ def run_transaction(db: Session, payment: FailedPayment) -> None:
             payment.status = "recovered"
             payment.final_action = decision.action
             payment.recovered_amount = payment.amount
-            payment.resolved_at = datetime.utcnow()
+            payment.resolved_at = payment.failed_at + timedelta(minutes=elapsed_minutes)
             db.commit()
 
 

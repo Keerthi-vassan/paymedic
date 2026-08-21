@@ -9,7 +9,7 @@ already be marked recovered by a bounded, individually-reasonable action
 before this check retroactively blocks it and its siblings.
 """
 
-from datetime import datetime, timedelta
+from datetime import timedelta
 
 from sqlalchemy.orm import Session
 
@@ -48,7 +48,12 @@ def check_after_action(db: Session, payment: FailedPayment) -> bool:
         p.status = "blocked"
         p.final_action = "safety_override"
         p.recovered_amount = 0.0
-        p.resolved_at = datetime.utcnow()
+        # A previously-resolved sibling keeps its own resolution timing (still
+        # meaningful -- that's genuinely when its own bounded action
+        # concluded); only the transaction still mid-processing gets a
+        # synthetic "caught quickly" timestamp here.
+        if p.resolved_at is None:
+            p.resolved_at = p.failed_at + timedelta(minutes=5)
 
         audit.log_event(
             db,

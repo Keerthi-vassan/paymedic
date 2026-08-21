@@ -72,3 +72,40 @@ class AuditListResponse(BaseModel):
     page: int
     page_size: int
     items: list[AuditLogOut]
+
+
+class MetricsSummaryOut(BaseModel):
+    total_transactions: int
+    total_at_risk_amount: float
+    total_recovered_amount: float
+    recovery_rate: float
+    escalation_rate: float
+    blocked_rate: float
+    false_action_rate: float
+    fraud_block_rate: float
+    avg_time_to_recovery_minutes: float | None
+    median_time_to_recovery_minutes: float | None
+
+
+class RootCauseBreakdownRowOut(BaseModel):
+    root_cause: str
+    total: int
+    recovered: int
+    escalated: int
+    blocked: int
+    open: int
+    recovery_rate: float
+
+
+class TimelinePointOut(BaseModel):
+    resolved_at: str
+    cumulative_recovered_amount: float
+
+
+class ConfigRulesOut(BaseModel):
+    root_cause_actions: dict[str, list[str]]
+    confidence_threshold: float
+    fraud_risk_score_threshold: float
+    velocity_window_minutes: int
+    velocity_threshold_count: int
+    llm_provider: str
