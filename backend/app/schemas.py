@@ -37,3 +37,37 @@ class PaymentsListResponse(BaseModel):
     page: int
     page_size: int
     items: list[FailedPaymentOut]
+
+
+class PipelineRunRequest(BaseModel):
+    transaction_ids: list[str] | None = None
+
+
+class PipelineRunResponse(BaseModel):
+    processed: int
+    recovered: int
+    escalated: int
+    total_recovered_amount: float
+
+
+class AuditLogOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    transaction_id: str
+    event_type: str
+    source: str
+    root_cause: str | None
+    confidence: float | None
+    action_taken: str | None
+    reasoning: str
+    outcome: str | None
+    attempt_number: int | None
+    created_at: datetime
+
+
+class AuditListResponse(BaseModel):
+    total: int
+    page: int
+    page_size: int
+    items: list[AuditLogOut]

@@ -2,7 +2,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import settings
-from app.routers import payments
+from app.routers import audit, payments, pipeline
 
 app = FastAPI(title="Revenue Recovery Agent")
 
@@ -15,6 +15,8 @@ app.add_middleware(
 )
 
 app.include_router(payments.router)
+app.include_router(pipeline.router)
+app.include_router(audit.router)
 
 
 @app.get("/health")
