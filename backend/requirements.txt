@@ -4,6 +4,8 @@ sqlalchemy==2.0.36
 pydantic==2.10.4
 pydantic-settings==2.7.1
 anthropic==0.42.0
+openai>=1.50.0
+google-genai>=0.3.0
 faker==33.1.0
 python-multipart==0.0.20
 pytest==8.3.4

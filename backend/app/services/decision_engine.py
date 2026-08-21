@@ -1,4 +1,5 @@
-"""Recovery decision engine. Pure, rule-gated, and deliberately dumb: it takes
+"""
+Recovery decision engine. Pure, rule-gated, and deliberately dumb: it takes
 only structured fields (never raw LLM text) and never moves money itself. This
 is the one place stopping rules are enforced -- fraud is never retried, and
 attempts never exceed the per-cause cap -- so it's unit-tested directly.

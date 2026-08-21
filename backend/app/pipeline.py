@@ -11,7 +11,7 @@ from datetime import datetime
 from sqlalchemy.orm import Session
 
 from app.models import FailedPayment
-from app.services import audit, classifier, decision_engine, executor
+from app.services import audit, classifier, decision_engine, executor, safety_monitor
 
 
 @dataclass
@@ -19,6 +19,7 @@ class PipelineRunSummary:
     processed: int
     recovered: int
     escalated: int
+    blocked: int
     total_recovered_amount: float
 
 
@@ -78,13 +79,22 @@ def run_transaction(db: Session, payment: FailedPayment) -> None:
             attempt_number=attempt_number,
         )
 
+        db.commit()
+
+        # Cross-transaction check, independent of this transaction's own
+        # outcome: may retroactively block this transaction (and siblings on
+        # the same instrument) even after a bounded, individually-reasonable
+        # action was just taken.
+        safety_monitor.check_after_action(db, payment)
+        if payment.status != "open":
+            break
+
         if outcome == "success":
             payment.status = "recovered"
             payment.final_action = decision.action
             payment.recovered_amount = payment.amount
             payment.resolved_at = datetime.utcnow()
-
-        db.commit()
+            db.commit()
 
 
 def run_batch(db: Session, transaction_ids: list[str] | None = None) -> PipelineRunSummary:
@@ -98,10 +108,12 @@ def run_batch(db: Session, transaction_ids: list[str] | None = None) -> Pipeline
 
     recovered = [p for p in payments if p.status == "recovered"]
     escalated = [p for p in payments if p.status == "escalated"]
+    blocked = [p for p in payments if p.status == "blocked"]
 
     return PipelineRunSummary(
         processed=len(payments),
         recovered=len(recovered),
         escalated=len(escalated),
+        blocked=len(blocked),
         total_recovered_amount=sum(p.recovered_amount for p in recovered),
     )

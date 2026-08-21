@@ -47,6 +47,7 @@ class PipelineRunResponse(BaseModel):
     processed: int
     recovered: int
     escalated: int
+    blocked: int
     total_recovered_amount: float
 
 

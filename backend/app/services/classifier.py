@@ -1,13 +1,15 @@
 """Root-cause classification: deterministic rules first, LLM fallback for the
-rest (wired in a later phase). Fraud is always decided by the risk_score rule
-below -- it is never delegated to the LLM, since it's the one safety-critical
-branch.
+rest. Fraud is always decided by the risk_score rule below -- it is never
+delegated to the LLM, since it's the one safety-critical branch. The LLM
+provider is swappable (see app/services/llm/) and, like the rules, only ever
+emits a label -- it never decides or executes a recovery action itself.
 """
 
 from dataclasses import dataclass
 
 from app.config import settings
 from app.models import FailedPayment
+from app.services import llm
 
 ERROR_CODE_TO_ROOT_CAUSE = {
     "INSUFFICIENT_FUNDS": "insufficient_funds",
@@ -33,7 +35,7 @@ class ClassificationResult:
     root_cause: str
     confidence: float
     reasoning: str
-    source: str  # rule_engine | llm
+    source: str  # rule_engine | llm:<provider> | llm:<provider>:error
 
 
 def classify(payment: FailedPayment) -> ClassificationResult:
@@ -57,15 +59,23 @@ def classify(payment: FailedPayment) -> ClassificationResult:
             source="rule_engine",
         )
 
-    # No deterministic rule matched. LLM fallback is wired in a later phase;
-    # for now this naturally routes to escalation via the decision engine's
-    # confidence threshold, since confidence is below it.
-    return ClassificationResult(
-        root_cause=AMBIGUOUS_ROOT_CAUSE,
-        confidence=0.0,
-        reasoning=(
-            f"error_code '{payment.error_code}' did not match any deterministic rule "
-            "-- LLM classification not yet wired, escalating for human review"
-        ),
-        source="rule_engine",
-    )
+    # No deterministic rule matched -- ask the LLM. A failed/unreachable call
+    # falls back to the same safe "ambiguous, zero confidence" shape a
+    # malformed response would, so the decision engine escalates for human
+    # review rather than silently skipping or misclassifying the transaction.
+    provider = llm.get_provider()
+    try:
+        result = provider.classify_ambiguous(payment)
+        return ClassificationResult(
+            root_cause=result.root_cause,
+            confidence=result.confidence,
+            reasoning=result.reasoning,
+            source=f"llm:{provider.name}",
+        )
+    except Exception as exc:
+        return ClassificationResult(
+            root_cause=AMBIGUOUS_ROOT_CAUSE,
+            confidence=0.0,
+            reasoning=f"LLM call failed ({exc}) -- escalating for human review",
+            source=f"llm:{provider.name}:error",
+        )

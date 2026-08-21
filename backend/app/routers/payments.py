@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 
 from app.db import Base, engine, get_db
-from app.models import FailedPayment
+from app.models import AuditLog, FailedPayment
 from app.schemas import FailedPaymentOut, GenerateBatchResponse, PaymentsListResponse
 from scripts.generate_dataset import generate_failed_payments
 
@@ -14,6 +14,10 @@ def generate(count: int = 100, seed: int = 42, db: Session = Depends(get_db)):
     Base.metadata.create_all(bind=engine)
 
     rows = generate_failed_payments(count=count, seed=seed)
+    # Transaction IDs are deterministic per (count, seed), so a fresh batch can
+    # reuse an id from a previous run -- clear its audit history too, or stale
+    # rows from that earlier run would leak into the new one's trail.
+    db.query(AuditLog).delete()
     db.query(FailedPayment).delete()
     db.bulk_insert_mappings(FailedPayment, rows)
     db.commit()

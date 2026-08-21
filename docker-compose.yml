@@ -6,7 +6,11 @@ services:
     volumes:
       - ./backend/data:/app/data
     environment:
+      - LLM_PROVIDER=${LLM_PROVIDER:-anthropic}
       - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - GEMINI_API_KEY=${GEMINI_API_KEY}
+      - SARVAM_API_KEY=${SARVAM_API_KEY}
       - DATABASE_URL=sqlite:////app/data/recovery.db
       - FRONTEND_ORIGIN=http://localhost:3000
 

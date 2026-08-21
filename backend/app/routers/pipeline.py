@@ -16,6 +16,7 @@ def run(request: PipelineRunRequest = PipelineRunRequest(), db: Session = Depend
         processed=summary.processed,
         recovered=summary.recovered,
         escalated=summary.escalated,
+        blocked=summary.blocked,
         total_recovered_amount=summary.total_recovered_amount,
     )
 
@@ -33,5 +34,6 @@ def run_single(transaction_id: str, db: Session = Depends(get_db)):
         processed=1 if was_open else 0,
         recovered=1 if payment.status == "recovered" else 0,
         escalated=1 if payment.status == "escalated" else 0,
+        blocked=1 if payment.status == "blocked" else 0,
         total_recovered_amount=payment.recovered_amount if payment.status == "recovered" else 0.0,
     )

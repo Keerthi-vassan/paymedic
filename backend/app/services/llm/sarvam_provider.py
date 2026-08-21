@@ -1,0 +1,47 @@
+import json
+
+from openai import OpenAI
+
+from app.config import settings
+from app.models import FailedPayment
+from app.services.llm.base import (
+    CLASSIFICATION_SCHEMA,
+    SYSTEM_PROMPT,
+    LLMClassification,
+    build_user_content,
+    validate_classification,
+)
+
+# Sarvam's /v1/chat/completions mirrors OpenAI's request/response shape and
+# documents Bearer-token auth specifically for OpenAI-compatible tooling, so
+# the openai SDK works here with just a base_url override -- no separate
+# Sarvam SDK dependency needed. Verify against current Sarvam docs if their
+# API changes (docs.sarvam.ai).
+SARVAM_BASE_URL = "https://api.sarvam.ai/v1"
+
+
+class SarvamProvider:
+    name = "sarvam"
+
+    def __init__(self):
+        self._client = OpenAI(api_key=settings.sarvam_api_key, base_url=SARVAM_BASE_URL)
+
+    def classify_ambiguous(self, payment: FailedPayment) -> LLMClassification:
+        response = self._client.chat.completions.create(
+            model=settings.sarvam_model,
+            messages=[
+                {"role": "system", "content": SYSTEM_PROMPT},
+                {"role": "user", "content": build_user_content(payment)},
+            ],
+            response_format={
+                "type": "json_schema",
+                "json_schema": {
+                    "name": "classification",
+                    "schema": CLASSIFICATION_SCHEMA,
+                    "strict": True,
+                },
+            },
+        )
+
+        raw = json.loads(response.choices[0].message.content)
+        return validate_classification(raw)
