@@ -29,7 +29,7 @@ class Settings(BaseSettings):
     openai_model: str = "gpt-5-mini"
 
     gemini_api_key: str = ""
-    gemini_model: str = "gemini-2.5-flash-lite"
+    gemini_model: str = "gemini-flash-latest"
 
     sarvam_api_key: str = ""
     sarvam_model: str = "sarvam-105b"

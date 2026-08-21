@@ -6,12 +6,25 @@ from google.genai import types
 from app.config import settings
 from app.models import FailedPayment
 from app.services.llm.base import (
-    CLASSIFICATION_SCHEMA,
+    ROOT_CAUSES,
     SYSTEM_PROMPT,
     LLMClassification,
     build_user_content,
     validate_classification,
 )
+
+# Gemini's response_schema is a stricter OpenAPI subset, not full JSON Schema --
+# it rejects fields like additionalProperties/maxLength that CLASSIFICATION_SCHEMA
+# uses, so this adapter builds its own compatible version.
+GEMINI_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "root_cause": {"type": "string", "enum": ROOT_CAUSES},
+        "confidence": {"type": "number"},
+        "reasoning": {"type": "string"},
+    },
+    "required": ["root_cause", "confidence", "reasoning"],
+}
 
 
 class GeminiProvider:
@@ -27,7 +40,7 @@ class GeminiProvider:
             config=types.GenerateContentConfig(
                 system_instruction=SYSTEM_PROMPT,
                 response_mime_type="application/json",
-                response_schema=CLASSIFICATION_SCHEMA,
+                response_schema=GEMINI_SCHEMA,
             ),
         )
 
