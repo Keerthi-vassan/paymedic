@@ -1,9 +1,9 @@
 # Build Plan
 
-> **Status:** Phases 1-4 complete (scaffold, simulated dataset,
+> **Status:** Phases 1-5 complete (scaffold, simulated dataset,
 > classify→decide→execute→audit pipeline, multi-provider LLM classification +
-> safety monitor). Phase 5 (metrics) is next. This doc is kept in sync with
-> what's actually implemented, not the original draft.
+> safety monitor, metrics layer). Phase 6 (dashboard) is next. This doc is
+> kept in sync with what's actually implemented, not the original draft.
 
 # Razorpay AI Buildathon — Revenue Recovery Agent
 
@@ -93,11 +93,13 @@ Build:
 ## Phase 5 — Metrics (Days 9-10)
 
 Build:
-- `services/metrics.py`: `total_recovered`, `total_at_risk`, `recovery_rate`, `false_action_rate` (transactions with a `safety_override` / transactions with any action), mean/median `time_to_recovery`, `escalation_rate`, `fraud_block_rate`.
+- `services/metrics.py`: `total_at_risk_amount`, `total_recovered_amount`, `recovery_rate`, `escalation_rate`, `blocked_rate`, `false_action_rate` (blocked / actioned transactions), `fraud_block_rate` (of all `true_root_cause == possible_fraud` cases — obvious and disguised — the % that ended `escalated` or `blocked`, i.e. never recovered), mean/median `time_to_recovery`. Also a per-root-cause breakdown and a cumulative-₹-recovered timeline.
 - `routers/metrics.py`: `GET /metrics/summary`, `GET /metrics/root-cause-breakdown`, `GET /metrics/timeline`.
 - `routers/config_rules.py`: `GET /config/rules` — renders the same cause→action/caps/threshold config the decision engine actually uses, so the "here are the bounds" claim is provably real, not just asserted.
+- `backend/tests/test_metrics.py`: rate calculations, empty-batch edge case, root-cause grouping, timeline ordering.
+- Bug found and fixed along the way: `resolved_at` was being set to real wall-clock time while `failed_at` is a backdated synthetic timestamp, making `time_to_recovery` measure "days since the dataset was generated" instead of anything meaningful. Fixed with a synthetic, deterministic resolution delay per action type (`executor.resolution_delay_minutes`) — immediate retries resolve in ~1 min, backoff retries in ~20 min, nudges in ~4 hours — so `resolved_at = failed_at + elapsed delay`.
 
-**What this gives you:** every number the pitch video and README need — ₹ recovered, recovery rate %, false-action rate, time-to-recovery — computed live from the batch via API, plus a machine-readable proof of the safety bounds for judges to inspect directly.
+**What this gives you:** every number the pitch video and README need — ₹ recovered, recovery rate %, false-action rate, time-to-recovery — computed live from the batch via API, plus a machine-readable proof of the safety bounds for judges to inspect directly. Verified on a real run: `possible_fraud` shows a hard 0% recovery rate across both the obviously-flagged and the disguised card-testing cases, and time-to-recovery now reads as realistic minutes (median ~5 min) instead of an artifact of dataset generation time.
 
 ---
 
