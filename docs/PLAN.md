@@ -2,8 +2,9 @@
 
 > **Status:** Phases 1-5 complete (scaffold, simulated dataset,
 > classify→decide→execute→audit pipeline, multi-provider LLM classification +
-> safety monitor, metrics layer). Phase 6 (dashboard) is next. This doc is
-> kept in sync with what's actually implemented, not the original draft.
+> safety monitor, metrics layer). Phase 6 (dashboard) is in progress — design
+> tooling setup first (see below), component build next. This doc is kept in
+> sync with what's actually implemented, not the original draft.
 
 # Razorpay AI Buildathon — Revenue Recovery Agent
 
@@ -105,10 +106,17 @@ Build:
 
 ## Phase 6 — Dashboard (Days 11-12)
 
+### Design tooling setup (before any component code)
+
+Wanted the dashboard to be genuinely well-designed rather than default AI-generated-looking output, so design tooling was set up and researched (not assumed) before writing any component code:
+- **Installed `impeccable`** (github.com/pbakaus/impeccable) — a real, actively maintained design-anti-slop skill for AI coding agents: 23 commands (`/polish`, `/audit`, `/typeset`, etc.), 59 automated checks against generic AI defaults, requires a `PRODUCT.md`/`DESIGN.md` design-context step before generating UI. Installed via the Claude-Code-native path (`/plugin marketplace add pbakaus/impeccable` + `/impeccable init`), not the generic cross-harness installer.
+- **No MCP servers.** Considered Tailwind MCP (mostly community utility-class lookups, or Flowbite's official one bundling a pre-built component kit) and Framer MCP (syncs code *from* an existing Framer canvas project). Neither adds value here — Tailwind is already well understood without a lookup server, a pre-built kit like Flowbite works against impeccable's whole purpose of rejecting generic/templated defaults, and there's no existing Framer file to sync from.
+
 Build:
+- `PRODUCT.md`/`DESIGN.md` design brief for Paymedic — audience (buildathon judges screen-recording a demo; secondary persona: merchant ops), product lane (B2B fintech ops tool, not marketing), personality (precise, trustworthy, calm, transparent), anti-references (generic SaaS gradients, glassmorphism, playful fintech, default Inter/DM Sans), status-driven color coding for open/recovered/escalated/blocked.
 - `MetricsSummary.tsx` (KPI tiles), `RootCauseBreakdown.tsx` (chart — use the `dataviz` skill for color/legend consistency), `ActionsTakenTable.tsx`, `AuditTrailPanel.tsx` (chronological per-transaction timeline with the `safety_override` event visually highlighted), `SafetyBoundsPanel.tsx` (renders `/config/rules` verbatim). `FailedPaymentsFeed.tsx` gets a row-click-to-open-audit-panel interaction.
 
-**What this gives you:** the actual thing judges click through — a legible, non-cherry-picked view of the whole batch's outcomes, with the deliberate failure case reachable and visually distinct in the audit trail, ready to screen-record for the pitch video.
+**What this gives you:** the actual thing judges click through — a legible, non-cherry-picked, genuinely well-designed view of the whole batch's outcomes, with the deliberate failure case reachable and visually distinct in the audit trail, ready to screen-record for the pitch video.
 
 ---
 
