@@ -4,19 +4,39 @@ import { useEffect, useState } from "react";
 
 import { getMetricsSummary } from "@/lib/api";
 import { formatCurrency, formatMinutes, formatPercent } from "@/lib/format";
+import { useCountUp } from "@/lib/useCountUp";
 import type { MetricsSummary as MetricsSummaryType } from "@/types";
-
-interface Tile {
-  label: string;
-  value: string;
-  emphasis?: boolean;
-}
 
 function TileSkeleton() {
   return (
-    <div className="flex flex-col gap-2 rounded-lg border border-border bg-surface p-4">
+    <div className="flex flex-col gap-2 rounded-lg border border-border bg-surface p-4 shadow-sm">
       <div className="h-3 w-20 animate-pulse rounded bg-surface-muted" />
       <div className="h-7 w-24 animate-pulse rounded bg-surface-muted" />
+    </div>
+  );
+}
+
+function Tile({
+  label,
+  value,
+  emphasis,
+}: {
+  label: string;
+  value: string;
+  emphasis?: boolean;
+}) {
+  return (
+    <div
+      className={`flex flex-col gap-1 rounded-lg border p-4 shadow-sm transition-shadow hover:shadow-md ${
+        emphasis ? "border-accent/20 bg-accent/5" : "border-border bg-surface"
+      }`}
+    >
+      <span className="text-xs font-medium text-muted-foreground">{label}</span>
+      <span
+        className={`tabular-nums text-2xl font-semibold ${emphasis ? "text-accent" : "text-foreground"}`}
+      >
+        {value}
+      </span>
     </div>
   );
 }
@@ -37,6 +57,15 @@ export function MetricsSummary({ refreshKey }: { refreshKey: number }) {
       })
       .finally(() => setLoading(false));
   }, [refreshKey]);
+
+  // Fixed hook count regardless of loading/error/empty state -- animated
+  // toward the real values once loaded, toward 0 otherwise (invisible while
+  // those branches render their own early return).
+  const recoveredAmount = useCountUp(metrics?.total_recovered_amount ?? 0);
+  const recoveryRate = useCountUp(metrics?.recovery_rate ?? 0);
+  const fraudBlockRate = useCountUp(metrics?.fraud_block_rate ?? 0);
+  const falseActionRate = useCountUp(metrics?.false_action_rate ?? 0);
+  const medianMinutes = useCountUp(metrics?.median_time_to_recovery_minutes ?? 0);
 
   if (loading) {
     return (
@@ -64,30 +93,24 @@ export function MetricsSummary({ refreshKey }: { refreshKey: number }) {
     );
   }
 
-  const tiles: Tile[] = [
-    { label: "₹ Recovered", value: formatCurrency(metrics.total_recovered_amount), emphasis: true },
-    { label: "Recovery Rate", value: formatPercent(metrics.recovery_rate) },
-    { label: "Fraud Block Rate", value: formatPercent(metrics.fraud_block_rate) },
-    { label: "False-Action Rate", value: formatPercent(metrics.false_action_rate) },
-    { label: "Median Time to Recovery", value: formatMinutes(metrics.median_time_to_recovery_minutes) },
+  const tiles = [
+    { label: "₹ Recovered", value: formatCurrency(recoveredAmount), emphasis: true },
+    { label: "Recovery Rate", value: formatPercent(recoveryRate) },
+    { label: "Fraud Block Rate", value: formatPercent(fraudBlockRate) },
+    { label: "False-Action Rate", value: formatPercent(falseActionRate) },
+    {
+      label: "Median Time to Recovery",
+      value:
+        metrics.median_time_to_recovery_minutes === null
+          ? "—"
+          : formatMinutes(medianMinutes),
+    },
   ];
 
   return (
     <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
       {tiles.map((tile) => (
-        <div
-          key={tile.label}
-          className="flex flex-col gap-1 rounded-lg border border-border bg-surface p-4"
-        >
-          <span className="text-xs font-medium text-muted-foreground">{tile.label}</span>
-          <span
-            className={`tabular-nums ${
-              tile.emphasis ? "text-2xl font-semibold text-accent" : "text-2xl font-semibold text-foreground"
-            }`}
-          >
-            {tile.value}
-          </span>
-        </div>
+        <Tile key={tile.label} label={tile.label} value={tile.value} emphasis={tile.emphasis} />
       ))}
     </div>
   );

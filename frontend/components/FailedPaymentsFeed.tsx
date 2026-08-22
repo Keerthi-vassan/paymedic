@@ -54,7 +54,7 @@ export function FailedPaymentsFeed({
   const totalPages = Math.max(Math.ceil(total / PAGE_SIZE), 1);
 
   return (
-    <div className="flex flex-col gap-3 rounded-lg border border-border bg-surface p-4">
+    <div className="flex flex-col gap-3 rounded-lg border border-border bg-surface p-4 shadow-sm">
       <div className="flex flex-wrap items-center gap-3">
         <h2 className="text-sm font-semibold text-foreground">Failed Payments</h2>
 
@@ -126,7 +126,7 @@ export function FailedPaymentsFeed({
               items.map((p) => (
                 <tr
                   key={p.transaction_id}
-                  className="cursor-pointer border-t border-border hover:bg-surface-muted"
+                  className="cursor-pointer border-t border-border transition-all duration-150 hover:translate-x-0.5 hover:bg-surface-muted"
                   onClick={() => onSelectTransaction(p.transaction_id)}
                 >
                   <td className="py-1.5 pr-3 font-mono text-xs text-foreground">{p.transaction_id}</td>
@@ -152,7 +152,7 @@ export function FailedPaymentsFeed({
         <button
           onClick={() => setPage((p) => Math.max(p - 1, 1))}
           disabled={page <= 1}
-          className="rounded border border-border px-2.5 py-1 text-xs disabled:opacity-50"
+          className="rounded border border-border px-2.5 py-1 text-xs transition-transform active:scale-95 disabled:opacity-50 disabled:active:scale-100"
         >
           Previous
         </button>
@@ -162,7 +162,7 @@ export function FailedPaymentsFeed({
         <button
           onClick={() => setPage((p) => Math.min(p + 1, totalPages))}
           disabled={page >= totalPages}
-          className="rounded border border-border px-2.5 py-1 text-xs disabled:opacity-50"
+          className="rounded border border-border px-2.5 py-1 text-xs transition-transform active:scale-95 disabled:opacity-50 disabled:active:scale-100"
         >
           Next
         </button>

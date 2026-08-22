@@ -26,7 +26,7 @@ export function SafetyBoundsPanel({ refreshKey }: { refreshKey: number }) {
 
   if (loading) {
     return (
-      <div className="flex flex-col gap-2 rounded-lg border border-border bg-surface p-4">
+      <div className="flex flex-col gap-2 rounded-lg border border-border bg-surface p-4 shadow-sm">
         <div className="h-4 w-32 animate-pulse rounded bg-surface-muted" />
         {Array.from({ length: 4 }).map((_, i) => (
           <div key={i} className="h-6 animate-pulse rounded bg-surface-muted" />
@@ -44,7 +44,7 @@ export function SafetyBoundsPanel({ refreshKey }: { refreshKey: number }) {
   }
 
   return (
-    <div className="flex flex-col gap-3 rounded-lg border border-border bg-surface p-4">
+    <div className="flex flex-col gap-3 rounded-lg border border-border bg-surface p-4 shadow-sm">
       <div>
         <h2 className="text-sm font-semibold text-foreground">Safety Bounds</h2>
         <p className="text-xs text-muted-foreground">

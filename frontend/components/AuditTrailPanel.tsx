@@ -12,12 +12,21 @@ const EVENT_LABELS: Record<string, string> = {
   safety_override: "Safety override",
 };
 
-function EventCard({ entry }: { entry: AuditLogEntry }) {
+function EventCard({ entry, index }: { entry: AuditLogEntry; index: number }) {
   const isOverride = entry.event_type === "safety_override";
+  const enterDelay = Math.min(index * 60, 300);
+  // Entrance for every card; the override card additionally gets a one-time
+  // ring pulse once its entrance settles, so the flagship moment lands.
+  const animation = isOverride
+    ? `card-enter 300ms cubic-bezier(0.16,1,0.3,1) ${enterDelay}ms backwards, override-pulse 1s ease-out ${
+        enterDelay + 300
+      }ms 1 backwards`
+    : `card-enter 300ms cubic-bezier(0.16,1,0.3,1) ${enterDelay}ms backwards`;
 
   return (
     <div
-      className={`relative rounded-md border px-3 py-2.5 ${
+      style={{ animation }}
+      className={`relative rounded-md border px-3 py-2.5 shadow-sm ${
         isOverride
           ? "border-status-blocked/40 bg-status-blocked/5"
           : "border-border bg-surface"
@@ -95,7 +104,7 @@ export function AuditTrailPanel({
           </div>
           <button
             onClick={onClose}
-            className="rounded p-1 text-muted-foreground hover:bg-surface-muted hover:text-foreground"
+            className="rounded p-1 text-muted-foreground transition-all hover:bg-surface-muted hover:text-foreground active:scale-90"
             aria-label="Close"
           >
             <svg className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
@@ -115,8 +124,8 @@ export function AuditTrailPanel({
             <p className="text-sm text-muted-foreground">No audit events for this transaction.</p>
           ) : (
             <div className="flex flex-col gap-2">
-              {entries.map((entry) => (
-                <EventCard key={entry.id} entry={entry} />
+              {entries.map((entry, index) => (
+                <EventCard key={entry.id} entry={entry} index={index} />
               ))}
             </div>
           )}

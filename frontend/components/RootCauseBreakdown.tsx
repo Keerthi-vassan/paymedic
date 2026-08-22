@@ -23,7 +23,16 @@ function BarRow({
   maxTotal: number;
   onHover: (row: RootCauseBreakdownRow | null) => void;
 }) {
-  const widthPct = Math.max((row.total / maxTotal) * 100, 4);
+  const targetWidthPct = Math.max((row.total / maxTotal) * 100, 4);
+  // Grows in from 0 whenever the underlying data changes, rather than
+  // snapping straight to its final width -- ties the motion to the data.
+  const [widthPct, setWidthPct] = useState(0);
+
+  useEffect(() => {
+    setWidthPct(0);
+    const raf = requestAnimationFrame(() => setWidthPct(targetWidthPct));
+    return () => cancelAnimationFrame(raf);
+  }, [targetWidthPct]);
 
   return (
     <div
@@ -36,7 +45,7 @@ function BarRow({
       </span>
       <div className="relative h-4 flex-1">
         <div
-          className="absolute inset-y-0 left-0 rounded-r-sm bg-accent transition-[width] group-hover:opacity-80"
+          className="absolute inset-y-0 left-0 rounded-r-sm bg-gradient-to-r from-accent to-accent/80 transition-[width] duration-500 ease-[cubic-bezier(0.16,1,0.3,1)] group-hover:opacity-80"
           style={{ width: `${widthPct}%` }}
         />
       </div>
@@ -94,7 +103,7 @@ export function RootCauseBreakdown({ refreshKey }: { refreshKey: number }) {
 
   if (loading) {
     return (
-      <div className="flex flex-col gap-3 rounded-lg border border-border bg-surface p-4">
+      <div className="flex flex-col gap-3 rounded-lg border border-border bg-surface p-4 shadow-sm">
         <div className="h-4 w-40 animate-pulse rounded bg-surface-muted" />
         {Array.from({ length: 6 }).map((_, i) => (
           <div key={i} className="h-4 animate-pulse rounded bg-surface-muted" />
@@ -126,7 +135,7 @@ export function RootCauseBreakdown({ refreshKey }: { refreshKey: number }) {
   const maxTotal = Math.max(...otherRows.map((r) => r.total), 1);
 
   return (
-    <div className="flex flex-col gap-4 rounded-lg border border-border bg-surface p-4">
+    <div className="flex flex-col gap-4 rounded-lg border border-border bg-surface p-4 shadow-sm">
       <div className="flex items-center justify-between">
         <h2 className="text-sm font-semibold text-foreground">Root Cause Breakdown</h2>
         {hovered && (
