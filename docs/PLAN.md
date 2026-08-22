@@ -1,10 +1,10 @@
 # Build Plan
 
-> **Status:** Phases 1-5 complete (scaffold, simulated dataset,
+> **Status:** Phases 1-6 complete (scaffold, simulated dataset,
 > classify→decide→execute→audit pipeline, multi-provider LLM classification +
-> safety monitor, metrics layer). Phase 6 (dashboard) is in progress — design
-> tooling setup first (see below), component build next. This doc is kept in
-> sync with what's actually implemented, not the original draft.
+> safety monitor, metrics layer, dashboard). Phase 7 (hardening & submission
+> prep) is next. This doc is kept in sync with what's actually implemented,
+> not the original draft.
 
 # Razorpay AI Buildathon — Revenue Recovery Agent
 
@@ -113,10 +113,13 @@ Wanted the dashboard to be genuinely well-designed rather than default AI-genera
 - **No MCP servers.** Considered Tailwind MCP (mostly community utility-class lookups, or Flowbite's official one bundling a pre-built component kit) and Framer MCP (syncs code *from* an existing Framer canvas project). Neither adds value here — Tailwind is already well understood without a lookup server, a pre-built kit like Flowbite works against impeccable's whole purpose of rejecting generic/templated defaults, and there's no existing Framer file to sync from.
 
 Build:
-- `PRODUCT.md`/`DESIGN.md` design brief for Paymedic — audience (buildathon judges screen-recording a demo; secondary persona: merchant ops), product lane (B2B fintech ops tool, not marketing), personality (precise, trustworthy, calm, transparent), anti-references (generic SaaS gradients, glassmorphism, playful fintech, default Inter/DM Sans), status-driven color coding for open/recovered/escalated/blocked.
-- `MetricsSummary.tsx` (KPI tiles), `RootCauseBreakdown.tsx` (chart — use the `dataviz` skill for color/legend consistency), `ActionsTakenTable.tsx`, `AuditTrailPanel.tsx` (chronological per-transaction timeline with the `safety_override` event visually highlighted), `SafetyBoundsPanel.tsx` (renders `/config/rules` verbatim). `FailedPaymentsFeed.tsx` gets a row-click-to-open-audit-panel interaction.
+- `PRODUCT.md` — audience, purpose, positioning, constraints, captured via impeccable's structured init interview (deliberately: "genuinely operable, not just demoable" over pure demo-optimization, per explicit direction).
+- `DESIGN.md` — Razorpay Blade-aligned palette (Prussian Blue `#012652` chrome, Dodger Blue `#0d94fb` accent — this is a submission built for and judged by Razorpay), restrained neutrals, Geist Sans/Mono, functional status colors independent of brand.
+- `RootCauseBreakdown.tsx`: used the `dataviz` skill's "emphasis form" guidance — `possible_fraud`'s 0% recovery rate is a deliberate safety guarantee, not a performance shortfall, so it's pulled out as a distinct annotated card (icon + label + explanation) rather than color-ranked alongside the other 5 categories on a shared magnitude scale, which would have misread it as a failure.
+- `MetricsSummary.tsx` (KPI tiles), `ActionsTakenTable.tsx` (every bounded action executed, batch-wide), `AuditTrailPanel.tsx` (side panel, not modal — chronological per-transaction timeline with `safety_override` visually distinct), `SafetyBoundsPanel.tsx` (renders `/config/rules` verbatim). `FailedPaymentsFeed.tsx` gets row-click-to-open-audit-panel.
+- Self-review against the skill's `craft-floor.md` checklist (mechanical detector: zero findings) caught and fixed 3 real issues before calling it done: two WCAG contrast failures (status-recovered and status-escalated text were 3.30:1/3.19:1 on white, below the 4.5:1 AA floor — fixed with darker text-only variants, verified by computing exact contrast ratios), plain "Loading..." text upgraded to skeleton rows in two tables, and browser-default focus ring/text selection themed from the accent color.
 
-**What this gives you:** the actual thing judges click through — a legible, non-cherry-picked, genuinely well-designed view of the whole batch's outcomes, with the deliberate failure case reachable and visually distinct in the audit trail, ready to screen-record for the pitch video.
+**What this gives you:** the actual thing judges click through — a legible, non-cherry-picked, genuinely well-designed view of the whole batch's outcomes. Screenshot-verified: the flagship card-testing cluster shows the full sequence (confident `gateway_timeout` classification → bounded retry → success → red `SAFETY OVERRIDE` card with the exact velocity-detection reasoning) live in the audit panel, ready to screen-record for the pitch video.
 
 ---
 
