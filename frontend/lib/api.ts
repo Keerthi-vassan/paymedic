@@ -1,4 +1,13 @@
-import type { GenerateBatchResponse, PaymentsListResponse } from "@/types";
+import type {
+  AuditListResponse,
+  ConfigRules,
+  GenerateBatchResponse,
+  MetricsSummary,
+  PaymentsListResponse,
+  PipelineRunResponse,
+  RootCauseBreakdownRow,
+  TimelinePoint,
+} from "@/types";
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000";
 
@@ -34,4 +43,28 @@ export function listPayments(params: {
   query.set("page_size", String(params.pageSize ?? 20));
 
   return apiFetch<PaymentsListResponse>(`/payments?${query.toString()}`);
+}
+
+export function runPipeline() {
+  return apiFetch<PipelineRunResponse>("/pipeline/run", { method: "POST" });
+}
+
+export function getTransactionAudit(transactionId: string) {
+  return apiFetch<AuditListResponse>(`/audit/${transactionId}`);
+}
+
+export function getMetricsSummary() {
+  return apiFetch<MetricsSummary>("/metrics/summary");
+}
+
+export function getRootCauseBreakdown() {
+  return apiFetch<RootCauseBreakdownRow[]>("/metrics/root-cause-breakdown");
+}
+
+export function getTimeline() {
+  return apiFetch<TimelinePoint[]>("/metrics/timeline");
+}
+
+export function getConfigRules() {
+  return apiFetch<ConfigRules>("/config/rules");
 }

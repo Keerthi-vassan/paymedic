@@ -2,7 +2,9 @@
 
 import { useCallback, useEffect, useState } from "react";
 
-import { generateBatch, listPayments } from "@/lib/api";
+import { listPayments } from "@/lib/api";
+import { formatCurrency } from "@/lib/format";
+import { StatusBadge } from "@/components/StatusBadge";
 import type { FailedPayment } from "@/types";
 
 const ROOT_CAUSES = [
@@ -16,20 +18,21 @@ const ROOT_CAUSES = [
 
 const STATUSES = ["open", "recovered", "escalated", "blocked"];
 
-const PAGE_SIZE = 20;
+const PAGE_SIZE = 12;
 
-function formatAmount(amount: number, currency: string) {
-  return new Intl.NumberFormat("en-IN", { style: "currency", currency }).format(amount);
-}
-
-export function FailedPaymentsFeed() {
+export function FailedPaymentsFeed({
+  refreshKey,
+  onSelectTransaction,
+}: {
+  refreshKey: number;
+  onSelectTransaction: (transactionId: string) => void;
+}) {
   const [items, setItems] = useState<FailedPayment[]>([]);
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
   const [status, setStatus] = useState("");
   const [rootCause, setRootCause] = useState("");
   const [loading, setLoading] = useState(false);
-  const [generating, setGenerating] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const refresh = useCallback(() => {
@@ -46,34 +49,14 @@ export function FailedPaymentsFeed() {
 
   useEffect(() => {
     refresh();
-  }, [refresh]);
-
-  const handleGenerate = async () => {
-    setGenerating(true);
-    setError(null);
-    try {
-      await generateBatch(100, 42);
-      setPage(1);
-      refresh();
-    } catch {
-      setError("Could not generate batch");
-    } finally {
-      setGenerating(false);
-    }
-  };
+  }, [refresh, refreshKey]);
 
   const totalPages = Math.max(Math.ceil(total / PAGE_SIZE), 1);
 
   return (
-    <div className="w-full max-w-6xl">
-      <div className="mb-4 flex flex-wrap items-center gap-3">
-        <button
-          onClick={handleGenerate}
-          disabled={generating}
-          className="rounded bg-black px-4 py-2 text-sm font-medium text-white disabled:opacity-50 dark:bg-white dark:text-black"
-        >
-          {generating ? "Generating..." : "Generate Batch (100)"}
-        </button>
+    <div className="flex flex-col gap-3 rounded-lg border border-border bg-surface p-4">
+      <div className="flex flex-wrap items-center gap-3">
+        <h2 className="text-sm font-semibold text-foreground">Failed Payments</h2>
 
         <select
           value={status}
@@ -81,7 +64,7 @@ export function FailedPaymentsFeed() {
             setStatus(e.target.value);
             setPage(1);
           }}
-          className="rounded border border-zinc-300 bg-white px-2 py-2 text-sm dark:border-zinc-700 dark:bg-black"
+          className="ml-auto rounded border border-border bg-surface px-2 py-1.5 text-xs"
         >
           <option value="">All statuses</option>
           {STATUSES.map((s) => (
@@ -97,7 +80,7 @@ export function FailedPaymentsFeed() {
             setRootCause(e.target.value);
             setPage(1);
           }}
-          className="rounded border border-zinc-300 bg-white px-2 py-2 text-sm dark:border-zinc-700 dark:bg-black"
+          className="rounded border border-border bg-surface px-2 py-1.5 text-xs"
         >
           <option value="">All root causes</option>
           {ROOT_CAUSES.map((c) => (
@@ -107,47 +90,55 @@ export function FailedPaymentsFeed() {
           ))}
         </select>
 
-        <span className="text-sm text-zinc-500">{total} transactions</span>
+        <span className="text-xs text-muted-foreground">{total} transactions</span>
       </div>
 
-      {error && <p className="mb-3 text-sm text-red-600">{error}</p>}
+      {error && <p className="text-sm text-status-blocked-text">{error}</p>}
 
-      <div className="overflow-x-auto rounded border border-zinc-200 dark:border-zinc-800">
+      <div className="overflow-x-auto">
         <table className="w-full text-left text-sm">
-          <thead className="bg-zinc-50 text-xs uppercase text-zinc-500 dark:bg-zinc-900">
+          <thead className="text-xs uppercase text-muted-foreground">
             <tr>
-              <th className="px-3 py-2">Transaction</th>
-              <th className="px-3 py-2">Amount</th>
-              <th className="px-3 py-2">Method</th>
-              <th className="px-3 py-2">Error Code</th>
-              <th className="px-3 py-2">Root Cause</th>
-              <th className="px-3 py-2">Status</th>
-              <th className="px-3 py-2">Failed At</th>
+              <th className="py-1.5 pr-3 font-medium">Transaction</th>
+              <th className="py-1.5 pr-3 font-medium">Amount</th>
+              <th className="py-1.5 pr-3 font-medium">Method</th>
+              <th className="py-1.5 pr-3 font-medium">Root Cause</th>
+              <th className="py-1.5 pr-3 font-medium">Status</th>
+              <th className="py-1.5 font-medium">Failed At</th>
             </tr>
           </thead>
           <tbody>
             {loading ? (
-              <tr>
-                <td colSpan={7} className="px-3 py-6 text-center text-zinc-500">
-                  Loading...
-                </td>
-              </tr>
+              Array.from({ length: 6 }).map((_, i) => (
+                <tr key={i} className="border-t border-border">
+                  <td colSpan={6} className="py-2">
+                    <div className="h-4 animate-pulse rounded bg-surface-muted" />
+                  </td>
+                </tr>
+              ))
             ) : items.length === 0 ? (
               <tr>
-                <td colSpan={7} className="px-3 py-6 text-center text-zinc-500">
+                <td colSpan={6} className="py-6 text-center text-muted-foreground">
                   No payments yet. Generate a batch to get started.
                 </td>
               </tr>
             ) : (
               items.map((p) => (
-                <tr key={p.transaction_id} className="border-t border-zinc-100 dark:border-zinc-800">
-                  <td className="px-3 py-2 font-mono text-xs">{p.transaction_id}</td>
-                  <td className="px-3 py-2">{formatAmount(p.amount, p.currency)}</td>
-                  <td className="px-3 py-2">{p.payment_method}</td>
-                  <td className="px-3 py-2 text-xs text-zinc-500">{p.error_code ?? "—"}</td>
-                  <td className="px-3 py-2">{p.true_root_cause}</td>
-                  <td className="px-3 py-2">{p.status}</td>
-                  <td className="px-3 py-2 text-xs text-zinc-500">
+                <tr
+                  key={p.transaction_id}
+                  className="cursor-pointer border-t border-border hover:bg-surface-muted"
+                  onClick={() => onSelectTransaction(p.transaction_id)}
+                >
+                  <td className="py-1.5 pr-3 font-mono text-xs text-foreground">{p.transaction_id}</td>
+                  <td className="py-1.5 pr-3 tabular-nums text-foreground">
+                    {formatCurrency(p.amount, p.currency)}
+                  </td>
+                  <td className="py-1.5 pr-3 text-foreground">{p.payment_method}</td>
+                  <td className="py-1.5 pr-3 text-foreground">{p.true_root_cause}</td>
+                  <td className="py-1.5 pr-3">
+                    <StatusBadge status={p.status} />
+                  </td>
+                  <td className="py-1.5 text-xs text-muted-foreground">
                     {new Date(p.failed_at).toLocaleString()}
                   </td>
                 </tr>
@@ -157,21 +148,21 @@ export function FailedPaymentsFeed() {
         </table>
       </div>
 
-      <div className="mt-3 flex items-center justify-between text-sm">
+      <div className="flex items-center justify-between text-sm">
         <button
           onClick={() => setPage((p) => Math.max(p - 1, 1))}
           disabled={page <= 1}
-          className="rounded border border-zinc-300 px-3 py-1 disabled:opacity-50 dark:border-zinc-700"
+          className="rounded border border-border px-2.5 py-1 text-xs disabled:opacity-50"
         >
           Previous
         </button>
-        <span>
+        <span className="text-xs text-muted-foreground">
           Page {page} of {totalPages}
         </span>
         <button
           onClick={() => setPage((p) => Math.min(p + 1, totalPages))}
           disabled={page >= totalPages}
-          className="rounded border border-zinc-300 px-3 py-1 disabled:opacity-50 dark:border-zinc-700"
+          className="rounded border border-border px-2.5 py-1 text-xs disabled:opacity-50"
         >
           Next
         </button>

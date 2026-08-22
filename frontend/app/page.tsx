@@ -2,47 +2,76 @@
 
 import { useEffect, useState } from "react";
 
+import { generateBatch, getHealth, runPipeline } from "@/lib/api";
+import { ActionsTakenTable } from "@/components/ActionsTakenTable";
+import { AuditTrailPanel } from "@/components/AuditTrailPanel";
 import { FailedPaymentsFeed } from "@/components/FailedPaymentsFeed";
-import { getHealth } from "@/lib/api";
+import { MetricsSummary } from "@/components/MetricsSummary";
+import { RootCauseBreakdown } from "@/components/RootCauseBreakdown";
+import { SafetyBoundsPanel } from "@/components/SafetyBoundsPanel";
+import { TopBar } from "@/components/TopBar";
 
 type HealthStatus = "checking" | "ok" | "error";
 
 export default function Home() {
-  const [status, setStatus] = useState<HealthStatus>("checking");
+  const [health, setHealth] = useState<HealthStatus>("checking");
+  const [refreshKey, setRefreshKey] = useState(0);
+  const [generating, setGenerating] = useState(false);
+  const [running, setRunning] = useState(false);
+  const [selectedTransaction, setSelectedTransaction] = useState<string | null>(null);
 
   useEffect(() => {
     getHealth()
-      .then(() => setStatus("ok"))
-      .catch(() => setStatus("error"));
+      .then(() => setHealth("ok"))
+      .catch(() => setHealth("error"));
   }, []);
 
-  const statusText: Record<HealthStatus, string> = {
-    checking: "Checking backend connection...",
-    ok: "Backend connected",
-    error: "Backend unreachable",
+  const handleGenerate = async () => {
+    setGenerating(true);
+    try {
+      await generateBatch(100, 42);
+      setRefreshKey((k) => k + 1);
+    } finally {
+      setGenerating(false);
+    }
   };
 
-  const statusColor: Record<HealthStatus, string> = {
-    checking: "bg-zinc-400",
-    ok: "bg-green-500",
-    error: "bg-red-500",
+  const handleRunPipeline = async () => {
+    setRunning(true);
+    try {
+      await runPipeline();
+      setRefreshKey((k) => k + 1);
+    } finally {
+      setRunning(false);
+    }
   };
 
   return (
-    <div className="flex min-h-screen flex-col items-center gap-6 bg-zinc-50 px-6 py-10 font-sans dark:bg-black">
-      <div className="flex flex-col items-center gap-2">
-        <h1 className="text-2xl font-semibold text-black dark:text-zinc-50">
-          Paymedic
-        </h1>
-        <div className="flex items-center gap-2">
-          <span className={`h-2.5 w-2.5 rounded-full ${statusColor[status]}`} />
-          <span className="text-sm text-zinc-600 dark:text-zinc-400">
-            {statusText[status]}
-          </span>
-        </div>
-      </div>
+    <div className="flex min-h-screen flex-col bg-background">
+      <TopBar
+        health={health}
+        generating={generating}
+        running={running}
+        onGenerate={handleGenerate}
+        onRunPipeline={handleRunPipeline}
+      />
 
-      <FailedPaymentsFeed />
+      <main className="mx-auto flex w-full max-w-7xl flex-1 flex-col gap-4 px-6 py-6">
+        <MetricsSummary refreshKey={refreshKey} />
+
+        <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
+          <div className="lg:col-span-2">
+            <RootCauseBreakdown refreshKey={refreshKey} />
+          </div>
+          <SafetyBoundsPanel refreshKey={refreshKey} />
+        </div>
+
+        <ActionsTakenTable refreshKey={refreshKey} onSelectTransaction={setSelectedTransaction} />
+
+        <FailedPaymentsFeed refreshKey={refreshKey} onSelectTransaction={setSelectedTransaction} />
+      </main>
+
+      <AuditTrailPanel transactionId={selectedTransaction} onClose={() => setSelectedTransaction(null)} />
     </div>
   );
 }
