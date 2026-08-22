@@ -1,8 +1,10 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { AnimatePresence, motion } from "framer-motion";
 
 import { getTransactionAudit } from "@/lib/api";
+import { rowVariants, staggerContainer, transitions } from "@/lib/motion";
 import type { AuditLogEntry } from "@/types";
 
 const EVENT_LABELS: Record<string, string> = {
@@ -12,26 +14,30 @@ const EVENT_LABELS: Record<string, string> = {
   safety_override: "Safety override",
 };
 
-function EventCard({ entry, index }: { entry: AuditLogEntry; index: number }) {
+function EventCard({ entry }: { entry: AuditLogEntry }) {
   const isOverride = entry.event_type === "safety_override";
-  const enterDelay = Math.min(index * 60, 300);
-  // Entrance for every card; the override card additionally gets a one-time
-  // ring pulse once its entrance settles, so the flagship moment lands.
-  const animation = isOverride
-    ? `card-enter 300ms cubic-bezier(0.16,1,0.3,1) ${enterDelay}ms backwards, override-pulse 1s ease-out ${
-        enterDelay + 300
-      }ms 1 backwards`
-    : `card-enter 300ms cubic-bezier(0.16,1,0.3,1) ${enterDelay}ms backwards`;
 
   return (
-    <div
-      style={{ animation }}
+    <motion.div
+      variants={rowVariants}
+      transition={transitions.row}
       className={`relative rounded-md border px-3 py-2.5 shadow-sm ${
-        isOverride
-          ? "border-status-blocked/40 bg-status-blocked/5"
-          : "border-border bg-surface"
+        isOverride ? "border-status-blocked/40 bg-status-blocked/5" : "border-border bg-surface"
       }`}
     >
+      {/* Independent of the card's own (staggered) entrance -- runs once,
+          starting once entrances have settled, to draw the eye to the
+          flagship "agent caught itself" moment. */}
+      {isOverride && (
+        <motion.div
+          aria-hidden
+          className="pointer-events-none absolute inset-0 rounded-md"
+          initial={{ boxShadow: "0 0 0 0 rgba(220, 38, 38, 0.35)" }}
+          animate={{ boxShadow: "0 0 0 8px rgba(220, 38, 38, 0)" }}
+          transition={{ duration: 1, ease: "easeOut", delay: 0.3 }}
+        />
+      )}
+
       <div className="flex items-center justify-between gap-2">
         <span
           className={`text-xs font-semibold uppercase tracking-wide ${
@@ -59,7 +65,7 @@ function EventCard({ entry, index }: { entry: AuditLogEntry; index: number }) {
         )}
         <span>source: {entry.source}</span>
       </div>
-    </div>
+    </motion.div>
   );
 }
 
@@ -86,51 +92,93 @@ export function AuditTrailPanel({
 
   return (
     <>
-      <div
-        className={`fixed inset-0 z-40 bg-black/20 transition-opacity duration-200 ${
-          isOpen ? "opacity-100" : "pointer-events-none opacity-0"
-        }`}
-        onClick={onClose}
-      />
-      <div
-        className={`fixed inset-y-0 right-0 z-50 flex w-full max-w-md flex-col border-l border-border bg-surface shadow-xl transition-transform duration-200 ${
-          isOpen ? "translate-x-0" : "translate-x-full"
-        }`}
-      >
-        <div className="flex items-center justify-between border-b border-border px-4 py-3">
-          <div>
-            <h2 className="text-sm font-semibold text-foreground">Audit Trail</h2>
-            <p className="font-mono text-xs text-muted-foreground">{transactionId}</p>
-          </div>
-          <button
+      <AnimatePresence>
+        {isOpen && (
+          <motion.div
+            key="backdrop"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={transitions.fade}
+            className="fixed inset-0 z-40 bg-black/20"
             onClick={onClose}
-            className="rounded p-1 text-muted-foreground transition-all hover:bg-surface-muted hover:text-foreground active:scale-90"
-            aria-label="Close"
-          >
-            <svg className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-              <path d="M6.28 5.22a.75.75 0 00-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 101.06 1.06L10 11.06l3.72 3.72a.75.75 0 101.06-1.06L11.06 10l3.72-3.72a.75.75 0 00-1.06-1.06L10 8.94 6.28 5.22z" />
-            </svg>
-          </button>
-        </div>
+          />
+        )}
+      </AnimatePresence>
 
-        <div className="flex-1 overflow-y-auto px-4 py-4">
-          {loading ? (
-            <div className="flex flex-col gap-2">
-              {Array.from({ length: 3 }).map((_, i) => (
-                <div key={i} className="h-16 animate-pulse rounded-md bg-surface-muted" />
-              ))}
+      <AnimatePresence>
+        {isOpen && (
+          <motion.div
+            key="panel"
+            initial={{ x: "100%" }}
+            animate={{ x: 0 }}
+            exit={{ x: "100%" }}
+            transition={transitions.panel}
+            className="fixed inset-y-0 right-0 z-50 flex w-full max-w-md flex-col border-l border-border bg-surface shadow-xl"
+          >
+            <div className="flex items-center justify-between border-b border-border px-4 py-3">
+              <div>
+                <h2 className="text-sm font-semibold text-foreground">Audit Trail</h2>
+                <p className="font-mono text-xs text-muted-foreground">{transactionId}</p>
+              </div>
+              <motion.button
+                onClick={onClose}
+                whileTap={{ scale: 0.9 }}
+                transition={transitions.press}
+                className="rounded p-1 text-muted-foreground transition-colors hover:bg-surface-muted hover:text-foreground"
+                aria-label="Close"
+              >
+                <svg className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                  <path d="M6.28 5.22a.75.75 0 00-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 101.06 1.06L10 11.06l3.72 3.72a.75.75 0 101.06-1.06L11.06 10l3.72-3.72a.75.75 0 00-1.06-1.06L10 8.94 6.28 5.22z" />
+                </svg>
+              </motion.button>
             </div>
-          ) : entries.length === 0 ? (
-            <p className="text-sm text-muted-foreground">No audit events for this transaction.</p>
-          ) : (
-            <div className="flex flex-col gap-2">
-              {entries.map((entry, index) => (
-                <EventCard key={entry.id} entry={entry} index={index} />
-              ))}
+
+            <div className="flex-1 overflow-y-auto px-4 py-4">
+              <AnimatePresence mode="wait">
+                {loading ? (
+                  <motion.div
+                    key="loading"
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    exit={{ opacity: 0 }}
+                    transition={transitions.fade}
+                    className="flex flex-col gap-2"
+                  >
+                    {Array.from({ length: 3 }).map((_, i) => (
+                      <div key={i} className="h-16 animate-pulse rounded-md bg-surface-muted" />
+                    ))}
+                  </motion.div>
+                ) : entries.length === 0 ? (
+                  <motion.p
+                    key="empty"
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    exit={{ opacity: 0 }}
+                    transition={transitions.fade}
+                    className="text-sm text-muted-foreground"
+                  >
+                    No audit events for this transaction.
+                  </motion.p>
+                ) : (
+                  <motion.div
+                    key="entries"
+                    initial="initial"
+                    animate="animate"
+                    exit={{ opacity: 0 }}
+                    variants={staggerContainer(0.06)}
+                    className="flex flex-col gap-2"
+                  >
+                    {entries.map((entry) => (
+                      <EventCard key={entry.id} entry={entry} />
+                    ))}
+                  </motion.div>
+                )}
+              </AnimatePresence>
             </div>
-          )}
-        </div>
-      </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </>
   );
 }

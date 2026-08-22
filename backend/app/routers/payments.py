@@ -1,3 +1,5 @@
+import random
+
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 
@@ -10,8 +12,13 @@ router = APIRouter(prefix="/payments", tags=["payments"])
 
 
 @router.post("/generate", response_model=GenerateBatchResponse)
-def generate(count: int = 100, seed: int = 42, db: Session = Depends(get_db)):
+def generate(count: int = 100, seed: int | None = None, db: Session = Depends(get_db)):
     Base.metadata.create_all(bind=engine)
+
+    # Omitting seed gives a genuinely fresh batch each call; passing seed=42
+    # explicitly (documented demo path) reproduces the frozen numbers.
+    if seed is None:
+        seed = random.SystemRandom().randint(0, 2**31 - 1)
 
     rows = generate_failed_payments(count=count, seed=seed)
     # Transaction IDs are deterministic per (count, seed), so a fresh batch can

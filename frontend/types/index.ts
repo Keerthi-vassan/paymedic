@@ -1,13 +1,16 @@
 export interface FailedPayment {
   transaction_id: string;
   customer_id: string;
+  /** Paise (smallest currency subunit) -- convert via formatCurrency, never display raw. */
   amount: number;
   currency: string;
   payment_method: string;
   payment_instrument_id: string;
   issuer_bank: string;
-  error_code: string | null;
-  error_description: string;
+  error_code: string;
+  error_source: string;
+  error_step: string;
+  error_reason: string | null;
   failed_at: string;
   network_type: string;
   latency_ms: number;
@@ -16,6 +19,7 @@ export interface FailedPayment {
   status: string;
   final_action: string | null;
   total_attempts: number;
+  /** Paise. */
   recovered_amount: number;
   resolved_at: string | null;
 }
@@ -37,6 +41,7 @@ export interface PipelineRunResponse {
   recovered: number;
   escalated: number;
   blocked: number;
+  /** Paise. */
   total_recovered_amount: number;
 }
 
@@ -63,7 +68,9 @@ export interface AuditListResponse {
 
 export interface MetricsSummary {
   total_transactions: number;
+  /** Paise. */
   total_at_risk_amount: number;
+  /** Paise. */
   total_recovered_amount: number;
   recovery_rate: number;
   escalation_rate: number;
@@ -86,6 +93,7 @@ export interface RootCauseBreakdownRow {
 
 export interface TimelinePoint {
   resolved_at: string;
+  /** Paise. */
   cumulative_recovered_amount: number;
 }
 

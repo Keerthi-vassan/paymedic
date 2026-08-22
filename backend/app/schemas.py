@@ -8,13 +8,15 @@ class FailedPaymentOut(BaseModel):
 
     transaction_id: str
     customer_id: str
-    amount: float
+    amount: int  # paise
     currency: str
     payment_method: str
     payment_instrument_id: str
     issuer_bank: str
-    error_code: str | None
-    error_description: str
+    error_code: str
+    error_source: str
+    error_step: str
+    error_reason: str | None
     failed_at: datetime
     network_type: str
     latency_ms: int
@@ -23,7 +25,7 @@ class FailedPaymentOut(BaseModel):
     status: str
     final_action: str | None
     total_attempts: int
-    recovered_amount: float
+    recovered_amount: int  # paise
     resolved_at: datetime | None
 
 
@@ -48,7 +50,7 @@ class PipelineRunResponse(BaseModel):
     recovered: int
     escalated: int
     blocked: int
-    total_recovered_amount: float
+    total_recovered_amount: int  # paise
 
 
 class AuditLogOut(BaseModel):
@@ -76,8 +78,8 @@ class AuditListResponse(BaseModel):
 
 class MetricsSummaryOut(BaseModel):
     total_transactions: int
-    total_at_risk_amount: float
-    total_recovered_amount: float
+    total_at_risk_amount: int  # paise
+    total_recovered_amount: int  # paise
     recovery_rate: float
     escalation_rate: float
     blocked_rate: float
@@ -99,7 +101,7 @@ class RootCauseBreakdownRowOut(BaseModel):
 
 class TimelinePointOut(BaseModel):
     resolved_at: str
-    cumulative_recovered_amount: float
+    cumulative_recovered_amount: int  # paise
 
 
 class ConfigRulesOut(BaseModel):

@@ -45,7 +45,9 @@ def build_user_content(payment: FailedPayment) -> str:
     return json.dumps(
         {
             "error_code": payment.error_code,
-            "error_description": payment.error_description,
+            "error_source": payment.error_source,
+            "error_step": payment.error_step,
+            "error_reason": payment.error_reason,
             "payment_method": payment.payment_method,
             "amount": payment.amount,
             "attempt_number": payment.total_attempts + 1,

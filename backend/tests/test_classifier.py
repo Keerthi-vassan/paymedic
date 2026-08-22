@@ -11,13 +11,15 @@ def make_payment(**overrides) -> FailedPayment:
     defaults = dict(
         transaction_id="txn_test",
         customer_id="cust_test",
-        amount=1000.0,
+        amount=100000,
         currency="INR",
         payment_method="card",
         payment_instrument_id="card_test",
         issuer_bank="Test Bank",
-        error_code="GATEWAY_TIMEOUT",
-        error_description="Gateway did not respond in time",
+        error_code="GATEWAY_ERROR",
+        error_source="gateway",
+        error_step="payment_authorization",
+        error_reason="gateway_timeout_error",
         failed_at=datetime(2026, 1, 1),
         network_type="wifi",
         latency_ms=100,
@@ -25,29 +27,29 @@ def make_payment(**overrides) -> FailedPayment:
         true_root_cause="gateway_timeout",
         status="open",
         total_attempts=0,
-        recovered_amount=0.0,
+        recovered_amount=0,
     )
     defaults.update(overrides)
     return FailedPayment(**defaults)
 
 
-def test_known_error_code_is_classified_deterministically_without_llm():
-    payment = make_payment(error_code="INSUFFICIENT_FUNDS", risk_score=0.1)
+def test_known_error_reason_is_classified_deterministically_without_llm():
+    payment = make_payment(error_reason="insufficient_funds", risk_score=0.1)
     result = classifier.classify(payment)
     assert result.root_cause == "insufficient_funds"
     assert result.source == "rule_engine"
     assert result.confidence >= 0.9
 
 
-def test_high_risk_score_is_flagged_as_fraud_regardless_of_error_code():
-    payment = make_payment(error_code="GATEWAY_TIMEOUT", risk_score=0.9)
+def test_high_risk_score_is_flagged_as_fraud_regardless_of_error_reason():
+    payment = make_payment(error_reason="gateway_timeout_error", risk_score=0.9)
     result = classifier.classify(payment)
     assert result.root_cause == "possible_fraud"
     assert result.source == "rule_engine"
 
 
-def test_unrecognized_error_code_routes_to_llm(monkeypatch):
-    payment = make_payment(error_code="SOME_UNKNOWN_CODE", risk_score=0.1)
+def test_unrecognized_error_reason_routes_to_llm(monkeypatch):
+    payment = make_payment(error_reason="some_unknown_reason", risk_score=0.1)
 
     class StubProvider:
         name = "stub"
@@ -64,7 +66,7 @@ def test_unrecognized_error_code_routes_to_llm(monkeypatch):
 
 
 def test_llm_failure_falls_back_to_safe_escalation(monkeypatch):
-    payment = make_payment(error_code="SOME_UNKNOWN_CODE", risk_score=0.1)
+    payment = make_payment(error_reason="some_unknown_reason", risk_score=0.1)
 
     class FailingProvider:
         name = "stub"

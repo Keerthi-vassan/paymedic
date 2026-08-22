@@ -47,7 +47,7 @@ def check_after_action(db: Session, payment: FailedPayment) -> bool:
         previous_status = p.status
         p.status = "blocked"
         p.final_action = "safety_override"
-        p.recovered_amount = 0.0
+        p.recovered_amount = 0
         # A previously-resolved sibling keeps its own resolution timing (still
         # meaningful -- that's genuinely when its own bounded action
         # concluded); only the transaction still mid-processing gets a

@@ -1,9 +1,11 @@
-export function formatCurrency(amount: number, currency = "INR"): string {
+/** `amountPaise` is the smallest currency subunit (Razorpay convention) --
+ * this is the sole place that converts to major units for display. */
+export function formatCurrency(amountPaise: number, currency = "INR"): string {
   return new Intl.NumberFormat("en-IN", {
     style: "currency",
     currency,
     maximumFractionDigits: 0,
-  }).format(amount);
+  }).format(amountPaise / 100);
 }
 
 export function formatPercent(value: number): string {

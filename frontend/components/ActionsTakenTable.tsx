@@ -1,7 +1,9 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { AnimatePresence, motion } from "framer-motion";
 
+import { rowVariants, transitions } from "@/lib/motion";
 import type { AuditLogEntry } from "@/types";
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000";
@@ -67,67 +69,92 @@ export function ActionsTakenTable({
             </tr>
           </thead>
           <tbody>
-            {loading ? (
-              Array.from({ length: 5 }).map((_, i) => (
-                <tr key={i} className="border-t border-border">
-                  <td colSpan={5} className="py-2">
-                    <div className="h-4 animate-pulse rounded bg-surface-muted" />
-                  </td>
-                </tr>
-              ))
-            ) : items.length === 0 ? (
-              <tr>
-                <td colSpan={5} className="py-6 text-center text-muted-foreground">
-                  No actions executed yet.
-                </td>
-              </tr>
-            ) : (
-              items.map((item) => (
-                <tr
-                  key={item.id}
-                  className="cursor-pointer border-t border-border transition-all duration-150 hover:translate-x-0.5 hover:bg-surface-muted"
-                  onClick={() => onSelectTransaction(item.transaction_id)}
-                >
-                  <td className="py-1.5 pr-3 font-mono text-xs text-foreground">
-                    {item.transaction_id}
-                  </td>
-                  <td className="py-1.5 pr-3 text-foreground">{item.root_cause ?? "—"}</td>
-                  <td className="py-1.5 pr-3 text-foreground">{item.action_taken ?? "—"}</td>
-                  <td className="py-1.5 pr-3 tabular-nums text-muted-foreground">
-                    {item.attempt_number ?? "—"}
-                  </td>
-                  <td
-                    className={`py-1.5 font-medium ${
-                      item.outcome === "success" ? "text-status-recovered-text" : "text-muted-foreground"
-                    }`}
-                  >
-                    {item.outcome ?? "—"}
-                  </td>
-                </tr>
-              ))
-            )}
+            <AnimatePresence mode="wait" initial={false}>
+              {loading
+                ? Array.from({ length: PAGE_SIZE }).map((_, i) => (
+                    <motion.tr
+                      key={`skeleton-${i}`}
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      exit={{ opacity: 0 }}
+                      transition={transitions.fade}
+                      className="border-t border-border"
+                    >
+                      <td colSpan={5} className="py-2">
+                        <div className="h-4 animate-pulse rounded bg-surface-muted" />
+                      </td>
+                    </motion.tr>
+                  ))
+                : items.length === 0
+                  ? (
+                      <motion.tr
+                        key="empty"
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        exit={{ opacity: 0 }}
+                        transition={transitions.fade}
+                      >
+                        <td colSpan={5} className="py-6 text-center text-muted-foreground">
+                          No actions executed yet.
+                        </td>
+                      </motion.tr>
+                    )
+                  : items.map((item) => (
+                      <motion.tr
+                        key={item.id}
+                        variants={rowVariants}
+                        initial="initial"
+                        animate="animate"
+                        exit="exit"
+                        transition={transitions.row}
+                        whileHover={{ x: 2 }}
+                        className="cursor-pointer border-t border-border hover:bg-surface-muted"
+                        onClick={() => onSelectTransaction(item.transaction_id)}
+                      >
+                        <td className="py-1.5 pr-3 font-mono text-xs text-foreground">
+                          {item.transaction_id}
+                        </td>
+                        <td className="py-1.5 pr-3 text-foreground">{item.root_cause ?? "—"}</td>
+                        <td className="py-1.5 pr-3 text-foreground">{item.action_taken ?? "—"}</td>
+                        <td className="py-1.5 pr-3 tabular-nums text-muted-foreground">
+                          {item.attempt_number ?? "—"}
+                        </td>
+                        <td
+                          className={`py-1.5 font-medium ${
+                            item.outcome === "success" ? "text-status-recovered-text" : "text-muted-foreground"
+                          }`}
+                        >
+                          {item.outcome ?? "—"}
+                        </td>
+                      </motion.tr>
+                    ))}
+            </AnimatePresence>
           </tbody>
         </table>
       </div>
 
       <div className="flex items-center justify-between text-sm">
-        <button
+        <motion.button
           onClick={() => setPage((p) => Math.max(p - 1, 1))}
           disabled={page <= 1}
-          className="rounded border border-border px-2.5 py-1 text-xs transition-transform active:scale-95 disabled:opacity-50 disabled:active:scale-100"
+          whileTap={{ scale: 0.95 }}
+          transition={transitions.press}
+          className="rounded border border-border px-2.5 py-1 text-xs disabled:opacity-50"
         >
           Previous
-        </button>
+        </motion.button>
         <span className="text-xs text-muted-foreground">
           Page {page} of {totalPages}
         </span>
-        <button
+        <motion.button
           onClick={() => setPage((p) => Math.min(p + 1, totalPages))}
           disabled={page >= totalPages}
-          className="rounded border border-border px-2.5 py-1 text-xs transition-transform active:scale-95 disabled:opacity-50 disabled:active:scale-100"
+          whileTap={{ scale: 0.95 }}
+          transition={transitions.press}
+          className="rounded border border-border px-2.5 py-1 text-xs disabled:opacity-50"
         >
           Next
-        </button>
+        </motion.button>
       </div>
     </div>
   );

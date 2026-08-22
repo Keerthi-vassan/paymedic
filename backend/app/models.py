@@ -11,13 +11,24 @@ class FailedPayment(Base):
 
     transaction_id: Mapped[str] = mapped_column(String, primary_key=True)
     customer_id: Mapped[str] = mapped_column(String)
-    amount: Mapped[float] = mapped_column(Float)
+    # Integer, in paise (smallest currency subunit) -- matches Razorpay's real
+    # amount convention. Never a rupee float.
+    amount: Mapped[int] = mapped_column(Integer)
     currency: Mapped[str] = mapped_column(String, default="INR")
     payment_method: Mapped[str] = mapped_column(String)
     payment_instrument_id: Mapped[str] = mapped_column(String)
     issuer_bank: Mapped[str] = mapped_column(String)
-    error_code: Mapped[str | None] = mapped_column(String, nullable=True)
-    error_description: Mapped[str] = mapped_column(String)
+
+    # Mirrors Razorpay's real Payment entity error shape: error_code is a
+    # coarse enum (BAD_REQUEST_ERROR/GATEWAY_ERROR/SERVER_ERROR), error_source/
+    # error_step describe where/when it failed, and error_reason is the
+    # fine-grained value the classifier's deterministic rules key off (see
+    # app/services/classifier.py) -- and the field masked for ambiguous rows.
+    error_code: Mapped[str] = mapped_column(String)
+    error_source: Mapped[str] = mapped_column(String)
+    error_step: Mapped[str] = mapped_column(String)
+    error_reason: Mapped[str | None] = mapped_column(String, nullable=True)
+
     failed_at: Mapped[datetime] = mapped_column(DateTime)
     network_type: Mapped[str] = mapped_column(String)
     latency_ms: Mapped[int] = mapped_column(Integer)
@@ -30,7 +41,7 @@ class FailedPayment(Base):
     status: Mapped[str] = mapped_column(String, default="open")
     final_action: Mapped[str | None] = mapped_column(String, nullable=True)
     total_attempts: Mapped[int] = mapped_column(Integer, default=0)
-    recovered_amount: Mapped[float] = mapped_column(Float, default=0)
+    recovered_amount: Mapped[int] = mapped_column(Integer, default=0)
     resolved_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
 
 

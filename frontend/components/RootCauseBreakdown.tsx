@@ -1,8 +1,10 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { AnimatePresence, motion } from "framer-motion";
 
 import { getRootCauseBreakdown } from "@/lib/api";
+import { transitions } from "@/lib/motion";
 import type { RootCauseBreakdownRow } from "@/types";
 
 const ROOT_CAUSE_LABELS: Record<string, string> = {
@@ -24,18 +26,13 @@ function BarRow({
   onHover: (row: RootCauseBreakdownRow | null) => void;
 }) {
   const targetWidthPct = Math.max((row.total / maxTotal) * 100, 4);
-  // Grows in from 0 whenever the underlying data changes, rather than
-  // snapping straight to its final width -- ties the motion to the data.
-  const [widthPct, setWidthPct] = useState(0);
-
-  useEffect(() => {
-    setWidthPct(0);
-    const raf = requestAnimationFrame(() => setWidthPct(targetWidthPct));
-    return () => cancelAnimationFrame(raf);
-  }, [targetWidthPct]);
 
   return (
-    <div
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      transition={transitions.row}
       className="group flex items-center gap-3"
       onMouseEnter={() => onHover(row)}
       onMouseLeave={() => onHover(null)}
@@ -44,15 +41,17 @@ function BarRow({
         {ROOT_CAUSE_LABELS[row.root_cause] ?? row.root_cause}
       </span>
       <div className="relative h-4 flex-1">
-        <div
-          className="absolute inset-y-0 left-0 rounded-r-sm bg-gradient-to-r from-accent to-accent/80 transition-[width] duration-500 ease-[cubic-bezier(0.16,1,0.3,1)] group-hover:opacity-80"
-          style={{ width: `${widthPct}%` }}
+        <motion.div
+          className="absolute inset-y-0 left-0 rounded-r-sm bg-gradient-to-r from-accent to-accent/80 group-hover:opacity-80"
+          initial={{ width: 0 }}
+          animate={{ width: `${targetWidthPct}%` }}
+          transition={transitions.bar}
         />
       </div>
       <span className="w-28 shrink-0 text-right text-sm tabular-nums text-muted-foreground">
         {row.total} · {row.recovery_rate.toFixed(0)}% recovered
       </span>
-    </div>
+    </motion.div>
   );
 }
 
@@ -86,7 +85,6 @@ export function RootCauseBreakdown({ refreshKey }: { refreshKey: number }) {
   const [rows, setRows] = useState<RootCauseBreakdownRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [hovered, setHovered] = useState<RootCauseBreakdownRow | null>(null);
-
   const [error, setError] = useState(false);
 
   useEffect(() => {
@@ -101,32 +99,7 @@ export function RootCauseBreakdown({ refreshKey }: { refreshKey: number }) {
       .finally(() => setLoading(false));
   }, [refreshKey]);
 
-  if (loading) {
-    return (
-      <div className="flex flex-col gap-3 rounded-lg border border-border bg-surface p-4 shadow-sm">
-        <div className="h-4 w-40 animate-pulse rounded bg-surface-muted" />
-        {Array.from({ length: 6 }).map((_, i) => (
-          <div key={i} className="h-4 animate-pulse rounded bg-surface-muted" />
-        ))}
-      </div>
-    );
-  }
-
-  if (error) {
-    return (
-      <div className="rounded-lg border border-status-blocked/30 bg-status-blocked/5 p-6 text-center text-sm text-status-blocked-text">
-        Could not load root-cause breakdown — the backend may be unreachable.
-      </div>
-    );
-  }
-
-  if (rows.length === 0) {
-    return (
-      <div className="rounded-lg border border-dashed border-border bg-surface p-6 text-center text-sm text-muted-foreground">
-        No root-cause data yet.
-      </div>
-    );
-  }
+  const state = loading ? "loading" : error ? "error" : rows.length === 0 ? "empty" : "data";
 
   const fraudRow = rows.find((r) => r.root_cause === "possible_fraud");
   const otherRows = rows
@@ -135,23 +108,78 @@ export function RootCauseBreakdown({ refreshKey }: { refreshKey: number }) {
   const maxTotal = Math.max(...otherRows.map((r) => r.total), 1);
 
   return (
-    <div className="flex flex-col gap-4 rounded-lg border border-border bg-surface p-4 shadow-sm">
-      <div className="flex items-center justify-between">
-        <h2 className="text-sm font-semibold text-foreground">Root Cause Breakdown</h2>
-        {hovered && (
-          <span className="text-xs text-muted-foreground">
-            {hovered.recovered} recovered · {hovered.escalated} escalated · {hovered.blocked} blocked
-          </span>
-        )}
-      </div>
+    <AnimatePresence mode="wait">
+      {state === "loading" && (
+        <motion.div
+          key="loading"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          transition={transitions.fade}
+          className="flex flex-col gap-3 rounded-lg border border-border bg-surface p-4 shadow-sm"
+        >
+          <div className="h-4 w-40 animate-pulse rounded bg-surface-muted" />
+          {Array.from({ length: 6 }).map((_, i) => (
+            <div key={i} className="h-4 animate-pulse rounded bg-surface-muted" />
+          ))}
+        </motion.div>
+      )}
 
-      <div className="flex flex-col gap-2.5">
-        {otherRows.map((row) => (
-          <BarRow key={row.root_cause} row={row} maxTotal={maxTotal} onHover={setHovered} />
-        ))}
-      </div>
+      {state === "error" && (
+        <motion.div
+          key="error"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          transition={transitions.fade}
+          className="rounded-lg border border-status-blocked/30 bg-status-blocked/5 p-6 text-center text-sm text-status-blocked-text"
+        >
+          Could not load root-cause breakdown — the backend may be unreachable.
+        </motion.div>
+      )}
 
-      {fraudRow && <FraudRow row={fraudRow} />}
-    </div>
+      {state === "empty" && (
+        <motion.div
+          key="empty"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          transition={transitions.fade}
+          className="rounded-lg border border-dashed border-border bg-surface p-6 text-center text-sm text-muted-foreground"
+        >
+          No root-cause data yet.
+        </motion.div>
+      )}
+
+      {state === "data" && (
+        <motion.div
+          key="data"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          transition={transitions.fade}
+          className="flex flex-col gap-4 rounded-lg border border-border bg-surface p-4 shadow-sm"
+        >
+          <div className="flex items-center justify-between">
+            <h2 className="text-sm font-semibold text-foreground">Root Cause Breakdown</h2>
+            {hovered && (
+              <span className="text-xs text-muted-foreground">
+                {hovered.recovered} recovered · {hovered.escalated} escalated · {hovered.blocked} blocked
+              </span>
+            )}
+          </div>
+
+          <div className="flex flex-col gap-2.5">
+            <AnimatePresence initial={false}>
+              {otherRows.map((row) => (
+                <BarRow key={row.root_cause} row={row} maxTotal={maxTotal} onHover={setHovered} />
+              ))}
+            </AnimatePresence>
+          </div>
+
+          {fraudRow && <FraudRow row={fraudRow} />}
+        </motion.div>
+      )}
+    </AnimatePresence>
   );
 }

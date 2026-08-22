@@ -8,13 +8,15 @@ def make_payment(db, **overrides):
     defaults = dict(
         transaction_id=f"txn_{overrides.get('transaction_id', 'x')}",
         customer_id="cust_test",
-        amount=1000.0,
+        amount=100000,
         currency="INR",
         payment_method="card",
         payment_instrument_id="card_test",
         issuer_bank="Test Bank",
-        error_code="GATEWAY_TIMEOUT",
-        error_description="Gateway did not respond in time",
+        error_code="GATEWAY_ERROR",
+        error_source="gateway",
+        error_step="payment_authorization",
+        error_reason="gateway_timeout_error",
         failed_at=datetime(2026, 1, 1, 12, 0, 0),
         network_type="wifi",
         latency_ms=500,
@@ -22,7 +24,7 @@ def make_payment(db, **overrides):
         true_root_cause="gateway_timeout",
         status="open",
         total_attempts=0,
-        recovered_amount=0.0,
+        recovered_amount=0,
         resolved_at=None,
     )
     defaults.update(overrides)

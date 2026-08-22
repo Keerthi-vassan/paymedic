@@ -23,11 +23,12 @@ export function getHealth() {
   return apiFetch<{ status: string }>("/health");
 }
 
-export function generateBatch(count = 100, seed = 42) {
-  return apiFetch<GenerateBatchResponse>(
-    `/payments/generate?count=${count}&seed=${seed}`,
-    { method: "POST" }
-  );
+export function generateBatch(count = 100, seed?: number) {
+  const query = new URLSearchParams({ count: String(count) });
+  if (seed !== undefined) query.set("seed", String(seed));
+  return apiFetch<GenerateBatchResponse>(`/payments/generate?${query.toString()}`, {
+    method: "POST",
+  });
 }
 
 export function listPayments(params: {

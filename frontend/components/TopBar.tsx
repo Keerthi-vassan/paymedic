@@ -1,5 +1,9 @@
 "use client";
 
+import { AnimatePresence, motion } from "framer-motion";
+
+import { transitions } from "@/lib/motion";
+
 type HealthStatus = "checking" | "ok" | "error";
 
 const STATUS_DOT: Record<HealthStatus, string> = {
@@ -34,35 +38,48 @@ export function TopBar({
       <div className="flex items-center gap-3">
         <h1 className="text-lg font-semibold text-chrome-foreground">Paymedic</h1>
         <div className="flex items-center gap-1.5">
-          <span className={`h-1.5 w-1.5 rounded-full ${STATUS_DOT[health]}`} />
+          <span className={`h-1.5 w-1.5 rounded-full transition-colors duration-200 ${STATUS_DOT[health]}`} />
           <span className="text-xs text-chrome-foreground/70">{STATUS_TEXT[health]}</span>
         </div>
       </div>
 
       <div className="flex items-center gap-3">
-        <span
-          className={`text-sm font-medium text-status-recovered transition-all duration-300 ${
-            lastRunSummary ? "translate-x-0 opacity-100" : "translate-x-1 opacity-0"
-          }`}
-          aria-live="polite"
-        >
-          {lastRunSummary}
-        </span>
+        <AnimatePresence>
+          {lastRunSummary && (
+            <motion.span
+              key={lastRunSummary}
+              initial={{ opacity: 0, x: 4 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0 }}
+              transition={transitions.fade}
+              className="text-sm font-medium text-status-recovered"
+              aria-live="polite"
+            >
+              {lastRunSummary}
+            </motion.span>
+          )}
+        </AnimatePresence>
 
-        <button
+        <motion.button
           onClick={onGenerate}
           disabled={generating}
-          className="rounded-md border border-white/15 px-3 py-1.5 text-sm font-medium text-chrome-foreground transition-all hover:bg-white/10 active:scale-95 disabled:opacity-50 disabled:active:scale-100"
+          whileHover={{ backgroundColor: "rgba(255,255,255,0.1)" }}
+          whileTap={{ scale: 0.95 }}
+          transition={transitions.hover}
+          className="rounded-md border border-white/15 px-3 py-1.5 text-sm font-medium text-chrome-foreground disabled:opacity-50"
         >
           {generating ? "Generating..." : "Generate Batch"}
-        </button>
-        <button
+        </motion.button>
+        <motion.button
           onClick={onRunPipeline}
           disabled={running}
-          className="rounded-md bg-accent px-3 py-1.5 text-sm font-medium text-accent-foreground transition-all hover:opacity-90 active:scale-95 disabled:opacity-50 disabled:active:scale-100"
+          whileHover={{ opacity: 0.9 }}
+          whileTap={{ scale: 0.95 }}
+          transition={transitions.hover}
+          className="rounded-md bg-accent px-3 py-1.5 text-sm font-medium text-accent-foreground disabled:opacity-50"
         >
           {running ? "Running..." : "Run Pipeline"}
-        </button>
+        </motion.button>
       </div>
     </header>
   );

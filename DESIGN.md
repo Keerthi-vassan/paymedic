@@ -42,7 +42,7 @@ Every interactive element carries default/hover/focus/disabled/loading states. L
 
 ## Motion
 
-150–250ms, state-only: panel slide-in (`duration-200`), bar-width transitions, hover/focus. No orchestrated load sequences — this is a tool people use, not a page people watch load.
+Framer Motion drives every stateful transition from one shared token scale (`frontend/lib/motion.ts`): four durations (120ms micro/press, 150ms hover, 200ms base — panel slide, row enter/exit — 300ms moderate — bar-fill, crossfades), one settle curve (`cubic-bezier(0.16,1,0.3,1)`, the original bar/card curve) for entrances and growth, standard ease-out for exits and hovers. Coverage is richer than the original pass — every state swap (skeleton→content, filtered/paginated rows, panel open/close) crossfades or FLIP-reorders rather than jump-cutting, and list entrances (audit event cards, table rows) get a restrained, data-driven stagger. Still no bounce/spring overshoot, and nothing plays on load that isn't tied to a real state or data change — this is a tool people use, not a page people watch load. `MotionConfig reducedMotion="user"` (`app/page.tsx`) plus the global `prefers-reduced-motion` CSS rule (`app/globals.css`) together collapse all of the above for users who've asked for it.
 
 ## Browser surfaces
 

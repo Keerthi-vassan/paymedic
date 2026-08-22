@@ -1,9 +1,11 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { AnimatePresence, motion } from "framer-motion";
 
 import { getMetricsSummary } from "@/lib/api";
 import { formatCurrency, formatMinutes, formatPercent } from "@/lib/format";
+import { transitions } from "@/lib/motion";
 import { useCountUp } from "@/lib/useCountUp";
 import type { MetricsSummary as MetricsSummaryType } from "@/types";
 
@@ -26,8 +28,10 @@ function Tile({
   emphasis?: boolean;
 }) {
   return (
-    <div
-      className={`flex flex-col gap-1 rounded-lg border p-4 shadow-sm transition-shadow hover:shadow-md ${
+    <motion.div
+      whileHover={{ y: -2, boxShadow: "0 4px 12px rgba(0,0,0,0.08)" }}
+      transition={transitions.hover}
+      className={`flex flex-col gap-1 rounded-lg border p-4 shadow-sm ${
         emphasis ? "border-accent/20 bg-accent/5" : "border-border bg-surface"
       }`}
     >
@@ -37,7 +41,7 @@ function Tile({
       >
         {value}
       </span>
-    </div>
+    </motion.div>
   );
 }
 
@@ -67,51 +71,85 @@ export function MetricsSummary({ refreshKey }: { refreshKey: number }) {
   const falseActionRate = useCountUp(metrics?.false_action_rate ?? 0);
   const medianMinutes = useCountUp(metrics?.median_time_to_recovery_minutes ?? 0);
 
-  if (loading) {
-    return (
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
-        {Array.from({ length: 5 }).map((_, i) => (
-          <TileSkeleton key={i} />
-        ))}
-      </div>
-    );
-  }
+  const state = loading
+    ? "loading"
+    : error
+      ? "error"
+      : !metrics || metrics.total_transactions === 0
+        ? "empty"
+        : "data";
 
-  if (error) {
-    return (
-      <div className="rounded-lg border border-status-blocked/30 bg-status-blocked/5 p-6 text-center text-sm text-status-blocked-text">
-        Could not load metrics — the backend may be unreachable.
-      </div>
-    );
-  }
-
-  if (!metrics || metrics.total_transactions === 0) {
-    return (
-      <div className="rounded-lg border border-dashed border-border bg-surface p-6 text-center text-sm text-muted-foreground">
-        No batch generated yet. Generate a batch and run the pipeline to see metrics.
-      </div>
-    );
-  }
-
-  const tiles = [
-    { label: "₹ Recovered", value: formatCurrency(recoveredAmount), emphasis: true },
-    { label: "Recovery Rate", value: formatPercent(recoveryRate) },
-    { label: "Fraud Block Rate", value: formatPercent(fraudBlockRate) },
-    { label: "False-Action Rate", value: formatPercent(falseActionRate) },
-    {
-      label: "Median Time to Recovery",
-      value:
-        metrics.median_time_to_recovery_minutes === null
-          ? "—"
-          : formatMinutes(medianMinutes),
-    },
-  ];
+  const tiles = metrics
+    ? [
+        { label: "₹ Recovered", value: formatCurrency(recoveredAmount), emphasis: true },
+        { label: "Recovery Rate", value: formatPercent(recoveryRate) },
+        { label: "Fraud Block Rate", value: formatPercent(fraudBlockRate) },
+        { label: "False-Action Rate", value: formatPercent(falseActionRate) },
+        {
+          label: "Median Time to Recovery",
+          value:
+            metrics.median_time_to_recovery_minutes === null ? "—" : formatMinutes(medianMinutes),
+        },
+      ]
+    : [];
 
   return (
-    <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
-      {tiles.map((tile) => (
-        <Tile key={tile.label} label={tile.label} value={tile.value} emphasis={tile.emphasis} />
-      ))}
-    </div>
+    <AnimatePresence mode="wait">
+      {state === "loading" && (
+        <motion.div
+          key="loading"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          transition={transitions.fade}
+          className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5"
+        >
+          {Array.from({ length: 5 }).map((_, i) => (
+            <TileSkeleton key={i} />
+          ))}
+        </motion.div>
+      )}
+
+      {state === "error" && (
+        <motion.div
+          key="error"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          transition={transitions.fade}
+          className="rounded-lg border border-status-blocked/30 bg-status-blocked/5 p-6 text-center text-sm text-status-blocked-text"
+        >
+          Could not load metrics — the backend may be unreachable.
+        </motion.div>
+      )}
+
+      {state === "empty" && (
+        <motion.div
+          key="empty"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          transition={transitions.fade}
+          className="rounded-lg border border-dashed border-border bg-surface p-6 text-center text-sm text-muted-foreground"
+        >
+          No batch generated yet. Generate a batch and run the pipeline to see metrics.
+        </motion.div>
+      )}
+
+      {state === "data" && (
+        <motion.div
+          key="data"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          transition={transitions.fade}
+          className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5"
+        >
+          {tiles.map((tile) => (
+            <Tile key={tile.label} label={tile.label} value={tile.value} emphasis={tile.emphasis} />
+          ))}
+        </motion.div>
+      )}
+    </AnimatePresence>
   );
 }

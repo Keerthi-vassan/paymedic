@@ -14,8 +14,8 @@ from app.models import FailedPayment
 @dataclass
 class MetricsSummary:
     total_transactions: int
-    total_at_risk_amount: float
-    total_recovered_amount: float
+    total_at_risk_amount: int  # paise
+    total_recovered_amount: int  # paise
     recovery_rate: float
     escalation_rate: float
     blocked_rate: float
@@ -39,7 +39,7 @@ class RootCauseBreakdownRow:
 @dataclass
 class TimelinePoint:
     resolved_at: str
-    cumulative_recovered_amount: float
+    cumulative_recovered_amount: int  # paise
 
 
 def _pct(numerator: int, denominator: int) -> float:
@@ -112,13 +112,13 @@ def compute_timeline(db: Session) -> list[TimelinePoint]:
     )
 
     points = []
-    running_total = 0.0
+    running_total = 0
     for p in recovered:
         running_total += p.recovered_amount
         points.append(
             TimelinePoint(
                 resolved_at=p.resolved_at.isoformat(),
-                cumulative_recovered_amount=round(running_total, 2),
+                cumulative_recovered_amount=running_total,
             )
         )
     return points

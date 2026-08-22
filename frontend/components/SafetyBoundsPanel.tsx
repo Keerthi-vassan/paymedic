@@ -1,8 +1,10 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { AnimatePresence, motion } from "framer-motion";
 
 import { getConfigRules } from "@/lib/api";
+import { transitions } from "@/lib/motion";
 import type { ConfigRules } from "@/types";
 
 const ACTION_LABELS: Record<string, string> = {
@@ -24,27 +26,48 @@ export function SafetyBoundsPanel({ refreshKey }: { refreshKey: number }) {
       .finally(() => setLoading(false));
   }, [refreshKey]);
 
-  if (loading) {
-    return (
-      <div className="flex flex-col gap-2 rounded-lg border border-border bg-surface p-4 shadow-sm">
-        <div className="h-4 w-32 animate-pulse rounded bg-surface-muted" />
-        {Array.from({ length: 4 }).map((_, i) => (
-          <div key={i} className="h-6 animate-pulse rounded bg-surface-muted" />
-        ))}
-      </div>
-    );
-  }
-
-  if (!rules) {
-    return (
-      <div className="rounded-lg border border-status-blocked/30 bg-status-blocked/5 p-4 text-sm text-status-blocked-text">
-        Could not load safety bounds — the backend may be unreachable.
-      </div>
-    );
-  }
+  const state = loading ? "loading" : !rules ? "error" : "data";
 
   return (
-    <div className="flex flex-col gap-3 rounded-lg border border-border bg-surface p-4 shadow-sm">
+    <AnimatePresence mode="wait">
+      {state === "loading" && (
+        <motion.div
+          key="loading"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          transition={transitions.fade}
+          className="flex flex-col gap-2 rounded-lg border border-border bg-surface p-4 shadow-sm"
+        >
+          <div className="h-4 w-32 animate-pulse rounded bg-surface-muted" />
+          {Array.from({ length: 4 }).map((_, i) => (
+            <div key={i} className="h-6 animate-pulse rounded bg-surface-muted" />
+          ))}
+        </motion.div>
+      )}
+
+      {state === "error" && (
+        <motion.div
+          key="error"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          transition={transitions.fade}
+          className="rounded-lg border border-status-blocked/30 bg-status-blocked/5 p-4 text-sm text-status-blocked-text"
+        >
+          Could not load safety bounds — the backend may be unreachable.
+        </motion.div>
+      )}
+
+      {state === "data" && rules && (
+        <motion.div
+          key="data"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          transition={transitions.fade}
+          className="flex flex-col gap-3 rounded-lg border border-border bg-surface p-4 shadow-sm"
+        >
       <div>
         <h2 className="text-sm font-semibold text-foreground">Safety Bounds</h2>
         <p className="text-xs text-muted-foreground">
@@ -87,6 +110,8 @@ export function SafetyBoundsPanel({ refreshKey }: { refreshKey: number }) {
           <span className="text-foreground">{rules.llm_provider}</span>
         </div>
       </div>
-    </div>
+        </motion.div>
+      )}
+    </AnimatePresence>
   );
 }

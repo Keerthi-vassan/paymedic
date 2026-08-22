@@ -11,20 +11,20 @@ from app.config import settings
 from app.models import FailedPayment
 from app.services import llm
 
-ERROR_CODE_TO_ROOT_CAUSE = {
-    "INSUFFICIENT_FUNDS": "insufficient_funds",
-    "INSUFFICIENT_BALANCE": "insufficient_funds",
-    "GATEWAY_TIMEOUT": "gateway_timeout",
-    "GATEWAY_ERROR": "gateway_timeout",
-    "BANK_DOWN": "gateway_timeout",
-    "AUTHENTICATION_ERROR": "auth_failure",
-    "OTP_MISMATCH": "auth_failure",
-    "INVALID_OTP": "auth_failure",
-    "NETWORK_ERROR": "network_drop",
-    "CONNECTION_RESET": "network_drop",
-    "CARD_DECLINED": "card_declined",
-    "ISSUER_DECLINED": "card_declined",
-    "DO_NOT_HONOR": "card_declined",
+ERROR_REASON_TO_ROOT_CAUSE = {
+    "insufficient_funds": "insufficient_funds",
+    "low_balance": "insufficient_funds",
+    "gateway_timeout_error": "gateway_timeout",
+    "gateway_technical_error": "gateway_timeout",
+    "bank_technical_error": "gateway_timeout",
+    "incorrect_otp": "auth_failure",
+    "authentication_failed": "auth_failure",
+    "otp_timeout": "auth_failure",
+    "connection_timeout": "network_drop",
+    "customer_connection_break": "network_drop",
+    "issuer_declined": "card_declined",
+    "do_not_honor": "card_declined",
+    "card_declined": "card_declined",
 }
 
 AMBIGUOUS_ROOT_CAUSE = "ambiguous"
@@ -50,12 +50,12 @@ def classify(payment: FailedPayment) -> ClassificationResult:
             source="rule_engine",
         )
 
-    if payment.error_code in ERROR_CODE_TO_ROOT_CAUSE:
-        root_cause = ERROR_CODE_TO_ROOT_CAUSE[payment.error_code]
+    if payment.error_reason in ERROR_REASON_TO_ROOT_CAUSE:
+        root_cause = ERROR_REASON_TO_ROOT_CAUSE[payment.error_reason]
         return ClassificationResult(
             root_cause=root_cause,
             confidence=0.95,
-            reasoning=f"error_code '{payment.error_code}' maps deterministically to {root_cause}",
+            reasoning=f"error_reason '{payment.error_reason}' maps deterministically to {root_cause}",
             source="rule_engine",
         )
 

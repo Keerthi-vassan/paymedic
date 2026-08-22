@@ -5,6 +5,7 @@ strictly increase each iteration, and every root cause has a finite max
 attempts (0 for fraud), so this can never spin.
 """
 
+from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 from datetime import timedelta
 
@@ -13,6 +14,8 @@ from sqlalchemy.orm import Session
 from app.models import FailedPayment
 from app.services import audit, classifier, decision_engine, executor, safety_monitor
 
+CLASSIFICATION_WORKERS = 8
+
 
 @dataclass
 class PipelineRunSummary:
@@ -20,14 +23,15 @@ class PipelineRunSummary:
     recovered: int
     escalated: int
     blocked: int
-    total_recovered_amount: float
+    total_recovered_amount: int  # paise
 
 
-def run_transaction(db: Session, payment: FailedPayment) -> None:
+def run_transaction(
+    db: Session, payment: FailedPayment, classification: classifier.ClassificationResult
+) -> None:
     if payment.status != "open":
         return
 
-    classification = classifier.classify(payment)
     audit.log_event(
         db,
         transaction_id=payment.transaction_id,
@@ -110,8 +114,18 @@ def run_batch(db: Session, transaction_ids: list[str] | None = None) -> Pipeline
         query = query.filter(FailedPayment.transaction_id.in_(transaction_ids))
 
     payments = query.all()
+
+    # classify() is a pure function of each payment's own fields -- no DB
+    # access, no cross-transaction state -- so it's safe to run concurrently.
+    # This is where nearly all the wall-clock time goes for ambiguous rows
+    # that fall through to the LLM. Everything after this (decide/execute/
+    # safety-monitor) stays strictly sequential: the safety monitor's
+    # card-testing check depends on transactions being processed in order.
+    with ThreadPoolExecutor(max_workers=CLASSIFICATION_WORKERS) as pool:
+        classifications = dict(zip(payments, pool.map(classifier.classify, payments)))
+
     for payment in payments:
-        run_transaction(db, payment)
+        run_transaction(db, payment, classifications[payment])
 
     recovered = [p for p in payments if p.status == "recovered"]
     escalated = [p for p in payments if p.status == "escalated"]

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { MotionConfig } from "framer-motion";
 
 import { generateBatch, getHealth, runPipeline } from "@/lib/api";
 import { formatCurrency } from "@/lib/format";
@@ -39,7 +40,7 @@ export default function Home() {
   const handleGenerate = async () => {
     setGenerating(true);
     try {
-      const res = await generateBatch(100, 42);
+      const res = await generateBatch(100);
       setRefreshKey((k) => k + 1);
       setLastRunSummary(`✓ Generated ${res.count} transactions`);
     } finally {
@@ -61,32 +62,34 @@ export default function Home() {
   };
 
   return (
-    <div className="flex min-h-screen flex-col bg-background">
-      <TopBar
-        health={health}
-        generating={generating}
-        running={running}
-        lastRunSummary={lastRunSummary}
-        onGenerate={handleGenerate}
-        onRunPipeline={handleRunPipeline}
-      />
+    <MotionConfig reducedMotion="user">
+      <div className="flex min-h-screen flex-col bg-background">
+        <TopBar
+          health={health}
+          generating={generating}
+          running={running}
+          lastRunSummary={lastRunSummary}
+          onGenerate={handleGenerate}
+          onRunPipeline={handleRunPipeline}
+        />
 
-      <main className="mx-auto flex w-full max-w-7xl flex-1 flex-col gap-4 px-6 py-6">
-        <MetricsSummary refreshKey={refreshKey} />
+        <main className="mx-auto flex w-full max-w-7xl flex-1 flex-col gap-4 px-6 py-6">
+          <MetricsSummary refreshKey={refreshKey} />
 
-        <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
-          <div className="lg:col-span-2">
-            <RootCauseBreakdown refreshKey={refreshKey} />
+          <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
+            <div className="lg:col-span-2">
+              <RootCauseBreakdown refreshKey={refreshKey} />
+            </div>
+            <SafetyBoundsPanel refreshKey={refreshKey} />
           </div>
-          <SafetyBoundsPanel refreshKey={refreshKey} />
-        </div>
 
-        <ActionsTakenTable refreshKey={refreshKey} onSelectTransaction={setSelectedTransaction} />
+          <ActionsTakenTable refreshKey={refreshKey} onSelectTransaction={setSelectedTransaction} />
 
-        <FailedPaymentsFeed refreshKey={refreshKey} onSelectTransaction={setSelectedTransaction} />
-      </main>
+          <FailedPaymentsFeed refreshKey={refreshKey} onSelectTransaction={setSelectedTransaction} />
+        </main>
 
-      <AuditTrailPanel transactionId={selectedTransaction} onClose={() => setSelectedTransaction(null)} />
-    </div>
+        <AuditTrailPanel transactionId={selectedTransaction} onClose={() => setSelectedTransaction(null)} />
+      </div>
+    </MotionConfig>
   );
 }

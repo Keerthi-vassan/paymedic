@@ -1,9 +1,11 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { AnimatePresence, motion } from "framer-motion";
 
 import { listPayments } from "@/lib/api";
 import { formatCurrency } from "@/lib/format";
+import { rowVariants, transitions } from "@/lib/motion";
 import { StatusBadge } from "@/components/StatusBadge";
 import type { FailedPayment } from "@/types";
 
@@ -108,64 +110,89 @@ export function FailedPaymentsFeed({
             </tr>
           </thead>
           <tbody>
-            {loading ? (
-              Array.from({ length: 6 }).map((_, i) => (
-                <tr key={i} className="border-t border-border">
-                  <td colSpan={6} className="py-2">
-                    <div className="h-4 animate-pulse rounded bg-surface-muted" />
-                  </td>
-                </tr>
-              ))
-            ) : items.length === 0 ? (
-              <tr>
-                <td colSpan={6} className="py-6 text-center text-muted-foreground">
-                  No payments yet. Generate a batch to get started.
-                </td>
-              </tr>
-            ) : (
-              items.map((p) => (
-                <tr
-                  key={p.transaction_id}
-                  className="cursor-pointer border-t border-border transition-all duration-150 hover:translate-x-0.5 hover:bg-surface-muted"
-                  onClick={() => onSelectTransaction(p.transaction_id)}
-                >
-                  <td className="py-1.5 pr-3 font-mono text-xs text-foreground">{p.transaction_id}</td>
-                  <td className="py-1.5 pr-3 tabular-nums text-foreground">
-                    {formatCurrency(p.amount, p.currency)}
-                  </td>
-                  <td className="py-1.5 pr-3 text-foreground">{p.payment_method}</td>
-                  <td className="py-1.5 pr-3 text-foreground">{p.true_root_cause}</td>
-                  <td className="py-1.5 pr-3">
-                    <StatusBadge status={p.status} />
-                  </td>
-                  <td className="py-1.5 text-xs text-muted-foreground">
-                    {new Date(p.failed_at).toLocaleString()}
-                  </td>
-                </tr>
-              ))
-            )}
+            <AnimatePresence mode="wait" initial={false}>
+              {loading
+                ? Array.from({ length: PAGE_SIZE }).map((_, i) => (
+                    <motion.tr
+                      key={`skeleton-${i}`}
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      exit={{ opacity: 0 }}
+                      transition={transitions.fade}
+                      className="border-t border-border"
+                    >
+                      <td colSpan={6} className="py-2">
+                        <div className="h-4 animate-pulse rounded bg-surface-muted" />
+                      </td>
+                    </motion.tr>
+                  ))
+                : items.length === 0
+                  ? (
+                      <motion.tr
+                        key="empty"
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        exit={{ opacity: 0 }}
+                        transition={transitions.fade}
+                      >
+                        <td colSpan={6} className="py-6 text-center text-muted-foreground">
+                          No payments yet. Generate a batch to get started.
+                        </td>
+                      </motion.tr>
+                    )
+                  : items.map((p) => (
+                      <motion.tr
+                        key={p.transaction_id}
+                        variants={rowVariants}
+                        initial="initial"
+                        animate="animate"
+                        exit="exit"
+                        transition={transitions.row}
+                        whileHover={{ x: 2 }}
+                        className="cursor-pointer border-t border-border hover:bg-surface-muted"
+                        onClick={() => onSelectTransaction(p.transaction_id)}
+                      >
+                        <td className="py-1.5 pr-3 font-mono text-xs text-foreground">{p.transaction_id}</td>
+                        <td className="py-1.5 pr-3 tabular-nums text-foreground">
+                          {formatCurrency(p.amount, p.currency)}
+                        </td>
+                        <td className="py-1.5 pr-3 text-foreground">{p.payment_method}</td>
+                        <td className="py-1.5 pr-3 text-foreground">{p.true_root_cause}</td>
+                        <td className="py-1.5 pr-3">
+                          <StatusBadge status={p.status} />
+                        </td>
+                        <td className="py-1.5 text-xs text-muted-foreground">
+                          {new Date(p.failed_at).toLocaleString()}
+                        </td>
+                      </motion.tr>
+                    ))}
+            </AnimatePresence>
           </tbody>
         </table>
       </div>
 
       <div className="flex items-center justify-between text-sm">
-        <button
+        <motion.button
           onClick={() => setPage((p) => Math.max(p - 1, 1))}
           disabled={page <= 1}
-          className="rounded border border-border px-2.5 py-1 text-xs transition-transform active:scale-95 disabled:opacity-50 disabled:active:scale-100"
+          whileTap={{ scale: 0.95 }}
+          transition={transitions.press}
+          className="rounded border border-border px-2.5 py-1 text-xs disabled:opacity-50"
         >
           Previous
-        </button>
+        </motion.button>
         <span className="text-xs text-muted-foreground">
           Page {page} of {totalPages}
         </span>
-        <button
+        <motion.button
           onClick={() => setPage((p) => Math.min(p + 1, totalPages))}
           disabled={page >= totalPages}
-          className="rounded border border-border px-2.5 py-1 text-xs transition-transform active:scale-95 disabled:opacity-50 disabled:active:scale-100"
+          whileTap={{ scale: 0.95 }}
+          transition={transitions.press}
+          className="rounded border border-border px-2.5 py-1 text-xs disabled:opacity-50"
         >
           Next
-        </button>
+        </motion.button>
       </div>
     </div>
   );

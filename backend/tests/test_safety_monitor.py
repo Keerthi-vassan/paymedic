@@ -8,13 +8,15 @@ def make_actioned_payment(db, transaction_id, instrument_id, failed_at, status="
     payment = FailedPayment(
         transaction_id=transaction_id,
         customer_id="cust_test",
-        amount=10.0,
+        amount=1000,
         currency="INR",
         payment_method="card",
         payment_instrument_id=instrument_id,
         issuer_bank="Test Bank",
-        error_code="GATEWAY_TIMEOUT",
-        error_description="Gateway did not respond in time",
+        error_code="GATEWAY_ERROR",
+        error_source="gateway",
+        error_step="payment_authorization",
+        error_reason="gateway_timeout_error",
         failed_at=failed_at,
         network_type="wifi",
         latency_ms=500,
@@ -22,7 +24,7 @@ def make_actioned_payment(db, transaction_id, instrument_id, failed_at, status="
         true_root_cause="possible_fraud",
         status=status,
         total_attempts=1,
-        recovered_amount=10.0 if status == "recovered" else 0.0,
+        recovered_amount=1000 if status == "recovered" else 0,
     )
     db.add(payment)
     db.commit()
