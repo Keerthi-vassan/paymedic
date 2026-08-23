@@ -15,11 +15,3 @@ frontend/.env.local
 
 # OS
 .DS_Store
-
-# Local planning notes
-CONTEXT.md
-
-# Locally installed agent skills (not part of the submission)
-.agents/
-.claude/
-skills-lock.json
