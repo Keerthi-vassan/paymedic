@@ -2,9 +2,12 @@
 
 > **Status:** Phases 1-6 complete (scaffold, simulated dataset,
 > classify→decide→execute→audit pipeline, multi-provider LLM classification +
-> safety monitor, metrics layer, dashboard). Phase 7 (hardening & submission
-> prep) is next. This doc is kept in sync with what's actually implemented,
-> not the original draft.
+> safety monitor, metrics layer, dashboard). Phase 6.5 complete (grounding
+> the decision engine's stopping rules in real Visa/Mastercard network
+> constraints, deferred a real Razorpay sandbox integration as a stretch
+> item — see that phase for why). Phase 7 (hardening & submission prep) is
+> next. This doc is kept in sync with what's actually implemented, not the
+> original draft.
 
 # Razorpay AI Buildathon — Revenue Recovery Agent
 
@@ -27,13 +30,18 @@ The plan below is broken into phases. **Each phase ends with a "What this gives 
 Failed payment event (simulated)
    → Root-cause classifier (deterministic rules first; LLM fallback for ambiguous cases only,
                              provider swappable via LLM_PROVIDER: anthropic | openai | gemini | sarvam)
-   → Recovery decision engine (rule-gated: cause → action, retry caps, fraud block, confidence threshold)
-   → Action executor (simulated outcomes via documented per-cause probability table, seeded/reproducible)
-   → Safety monitor (runs after every action; detects cross-transaction patterns like card-testing velocity;
-                      can override a transaction even after a rule-gated action was taken, marking it `blocked`
-                      rather than `escalated` -- the "agent catches itself" mechanism)
-   → Audit log (every step — classification, decision, execution, override — logged with reasoning + timestamp)
-   → Metrics layer (₹ recovered, recovery rate %, false-action rate, time-to-recovery)  [Phase 5, next]
+   → Recovery decision engine (rule-gated: cause → action, retry caps, fraud block, confidence threshold,
+                                network compliance ceiling -- a real ~15-attempt/30-day Visa/Mastercard
+                                reattempt limit, checked independently of any per-cause cap)
+   → Action executor (simulated outcomes via documented per-cause probability table, seeded/reproducible;
+                       retry scheduling spaced across days -- 2/5/7-day backoff -- not a flat cosmetic delay)
+   → Safety monitor (runs after every action; two independent cross-transaction checks -- shared payment
+                      instrument, and distinct instruments sharing one IP -- either can override a
+                      transaction even after a rule-gated action was taken, marking it `blocked` rather
+                      than `escalated` -- the "agent catches itself" mechanism)
+   → Audit log (every step — classification, decision, execution, override — logged with reasoning,
+                 timestamp, and the projected retry schedule where applicable)
+   → Metrics layer (₹ recovered, recovery rate %, false-action rate, time-to-recovery)
 ```
 
 The LLM never sees or controls money movement directly — it only emits `(root_cause, confidence, reasoning)` via a structured schema (strict tool-use for Anthropic, `json_schema` response format for OpenAI/Sarvam, `response_schema` for Gemini), which then feeds the independent, rule-based `decision_engine.py`. Every adapter validates the response before it reaches the decision engine — an unrecognized root cause or a failed call falls back to `ambiguous`/0 confidence, which the decision engine turns into a safe escalation rather than a wrong action. Fraud detection is always rule-based (`risk_score` threshold), never delegated to the LLM, since it's the one safety-critical branch.
@@ -116,11 +124,30 @@ Build:
 - `PRODUCT.md` — audience, purpose, positioning, constraints, captured via impeccable's structured init interview (deliberately: "genuinely operable, not just demoable" over pure demo-optimization, per explicit direction).
 - `DESIGN.md` — Razorpay Blade-aligned palette (Prussian Blue `#012652` chrome, Dodger Blue `#0d94fb` accent — this is a submission built for and judged by Razorpay), restrained neutrals, Geist Sans/Mono, functional status colors independent of brand.
 - `RootCauseBreakdown.tsx`: used the `dataviz` skill's "emphasis form" guidance — `possible_fraud`'s 0% recovery rate is a deliberate safety guarantee, not a performance shortfall, so it's pulled out as a distinct annotated card (icon + label + explanation) rather than color-ranked alongside the other 5 categories on a shared magnitude scale, which would have misread it as a failure.
-- `MetricsSummary.tsx` (KPI tiles), `ActionsTakenTable.tsx` (every bounded action executed, batch-wide), `AuditTrailPanel.tsx` (side panel, not modal — chronological per-transaction timeline with `safety_override` visually distinct), `SafetyBoundsPanel.tsx` (renders `/config/rules` verbatim). `FailedPaymentsFeed.tsx` gets row-click-to-open-audit-panel.
+- `MetricsSummary.tsx` (KPI tiles), `ActionsTakenTable.tsx` (every bounded action executed, batch-wide), `AuditTrailPanel.tsx` (side panel, not modal — chronological per-transaction timeline with `safety_override` visually distinct), `SafetyBoundsPanel.tsx` (renders the live `/config/rules` data, labeled/formatted for readability rather than a raw JSON dump — see Phase 6.5 for the network-compliance section added later). `FailedPaymentsFeed.tsx` gets row-click-to-open-audit-panel.
 - Self-review against the skill's `craft-floor.md` checklist (mechanical detector: zero findings) caught and fixed 3 real issues before calling it done: two WCAG contrast failures (status-recovered and status-escalated text were 3.30:1/3.19:1 on white, below the 4.5:1 AA floor — fixed with darker text-only variants, verified by computing exact contrast ratios), plain "Loading..." text upgraded to skeleton rows in two tables, and browser-default focus ring/text selection themed from the accent color.
 - **Polish pass** (user feedback: "colors are solid, no micro-interactions") — mapped to impeccable's `bolder`/`animate` guidance rather than freehand changes. Depth: soft elevation shadows throughout (previously border-only), a subtle same-hue gradient on chart bars, accent-tinted background on the emphasized ₹-Recovered tile. Micro-interactions: KPI numbers count up on load/change (`lib/useCountUp.ts`, respects `prefers-reduced-motion`), root-cause bars grow in from 0 on data change, button press feedback, a brief inline success toast after Generate Batch/Run Pipeline, richer row hover, and a one-time entrance pulse specifically on the `safety_override` card. Global `prefers-reduced-motion` CSS override added. Re-ran the mechanical detector after — zero findings.
 
 **What this gives you:** the actual thing judges click through — a legible, non-cherry-picked, genuinely well-designed view of the whole batch's outcomes. Screenshot-verified: the flagship card-testing cluster shows the full sequence (confident `gateway_timeout` classification → bounded retry → success → red `SAFETY OVERRIDE` card with the exact velocity-detection reasoning) live in the audit panel, ready to screen-record for the pitch video.
+
+---
+
+## Phase 6.5 — Grounding stopping rules in real network constraints
+
+Prompted by a deep-research pass (kept outside the repo, at the parent directory of `paymedic/`) into how real payment-recovery systems and card networks actually work: the project's stopping rules were internally consistent but self-authored — invented per-cause retry caps, a flat cosmetic delay model, a single-signal fraud check — rather than grounded in the constraints Visa/Mastercard and the industry actually publish and enforce. Three changes converted already-correct-by-accident behavior into explicitly cited, on-screen-legible policy, without touching the "no real money" boundary already committed to:
+
+- `decision_engine.py`: added `DECLINE_TYPE` (soft/hard per root cause — purely additive labeling, no behavior change, since `card_declined`/`possible_fraud` already got zero same-instrument retries) and one new check — `attempts_so_far >= settings.network_retry_ceiling` (15, the real Visa/Mastercard ~15-attempt/30-day reattempt-limit rule) → escalate, citing the rule by name. Positioned between the fraud checks and the confidence check specifically because every per-cause cap tops out at 3 — placed after the per-cause-cap check instead, it would be permanently unreachable.
+- `executor.py`: `resolution_delay_minutes` is now keyed by `(action, attempt_number)` instead of action alone — backoff retries escalate 2/5/7 days across attempts (a full `gateway_timeout` sequence lands ~12 days out, inside the industry's "3-5 attempts over 10-14 days" pattern) instead of a flat 20 minutes. `pipeline.py` now writes the projected `scheduled_at` onto the "decision" audit event.
+- `safety_monitor.py`: a second, independent check — 3+ *distinct* payment instruments sharing one IP within the velocity window (not raw row count, so one customer retrying their own card doesn't false-positive) — runs alongside the original single-instrument check. Both always run; a transaction matching both is only overridden once (relies on SQLAlchemy's default autoflush so the second check sees the first's pending status change).
+- `generate_dataset.py`: every row now carries a synthetic `ip_address` (RFC 5737 documentation ranges only). Two new always-present engineered cases, so all three mechanisms have an actual on-screen demo moment rather than only being reachable in a unit test: a 4-row IP-velocity cluster (distinct cards, one shared IP — the inverse of the existing single-instrument cluster) and a single row pre-seeded at `total_attempts = network_retry_ceiling` to trigger the new compliance check on its very first pass.
+- Frontend: `SafetyBoundsPanel.tsx` gained a **Network compliance** section (decline-type map, reattempt ceiling, citation) and a second velocity-check row; `AuditTrailPanel.tsx` shows a "next attempt scheduled" line on decision events that didn't escalate. Both are additive uses of the existing panel/badge patterns — no new visual language.
+- Backend: 35/35 tests passing (11 new, including a fix to two pre-existing test helpers — `test_classifier.py`, `test_metrics.py` — that constructed `FailedPayment` rows directly and would have broken once `ip_address` became a required column).
+
+**Deliberately deferred, not built**: real Razorpay test-mode sandbox integration (blending a small number of real API-driven transactions into the batch). The research found Razorpay's UPI Collect flow — the simplest, pure-API-call path for this — was deprecated February 2026; the remaining viable path (Orders API + Checkout.js test cards driven by a small headless-browser script, polling `GET /payments/{id}` rather than standing up a public webhook endpoint) is a real, heavier lift. Scoped out given the days remaining before the 5 Sep 2026 deadline; worth revisiting if time permits after Phase 7.
+
+**What this gives you:** every stopping rule in the demo is now citable against a real, external constraint rather than an internal judgment call — the kind of grounding that reads very differently to judges who operate the real version of this system. Verified live via Docker and a real browser: the network-ceiling escalation, both safety-override clusters (4 instrument-based, 4 IP-based), and the "next attempt scheduled" badge all render correctly. One expected, deliberate side effect: median time-to-recovery moved from ~5 minutes to 48 hours, and the frozen `seed=42` numbers below reflect the new run — not a regression, the realistic-scheduling change working as intended.
+
+**Updated frozen `seed=42` numbers** (100 transactions, re-run after this phase): 39% recovery rate, ₹10,90,085 recovered, 100% fraud block rate (13 fraud-labeled transactions: 5 escalated on a plain risk-score flag, 8 caught retroactively — 4 single-instrument, 4 IP-based), 9.88% false-action rate, 48 hr median time-to-recovery, 39 recovered / 53 escalated / 8 blocked. Not yet written into any submission doc (there isn't one yet — see Phase 7). Note: ~17% of rows route through live LLM classification, so re-running the same seed can shift outcome counts by roughly ±1 transaction.
 
 ---
 
@@ -137,7 +164,7 @@ Build:
 
 ## Verification
 
-- Unit tests (`backend/tests/`, 20 passing) assert: fraud-flagged transactions are never retried; retry caps are never exceeded; low-confidence classifications always escalate rather than act; the safety monitor triggers only at threshold, respects the time window, ignores unrelated instruments, and doesn't reprocess already-blocked transactions.
+- Unit tests (`backend/tests/`, 35 passing) assert: fraud-flagged transactions are never retried; retry caps are never exceeded, including the network compliance ceiling independent of any per-cause cap; low-confidence classifications always escalate rather than act; the safety monitor triggers only at threshold on either signal (shared instrument, or distinct instruments sharing an IP), respects the time window, ignores unrelated instruments, doesn't reprocess already-blocked transactions, and doesn't double-log a transaction matching both patterns; retry scheduling escalates correctly across attempts; `scheduled_at` is populated exactly when the engine doesn't escalate.
 - `docker compose up --build` from a clean clone should bring up both services and let the dashboard load real data end-to-end — re-run before every phase boundary, not just at the end.
 - **Manually confirmed** (not just assumed from the code) that the constructed card-testing transaction cluster, viewed via `GET /audit/{transaction_id}` and the dashboard's `blocked` status filter, shows: initial confident classification → bounded retry action → success → `safety_override` audit event → `blocked` status. This is the flagship "agent was wrong, caught itself" demo moment.
 
@@ -147,6 +174,9 @@ Build:
 - `backend/app/services/classifier.py`
 - `backend/app/services/llm/` (`base.py`, `anthropic_provider.py`, `openai_provider.py`, `gemini_provider.py`, `sarvam_provider.py`, `__init__.py`)
 - `backend/app/services/safety_monitor.py`
+- `backend/app/services/executor.py`
+- `backend/app/pipeline.py`
+- `backend/app/config.py` (every threshold, including the network compliance ceiling)
 - `backend/scripts/generate_dataset.py`
 - `backend/app/models.py`
 - `docker-compose.yml`

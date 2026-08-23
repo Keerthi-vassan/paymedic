@@ -16,11 +16,11 @@ Paymedic detects at-risk revenue (failed payments) and runs a bounded, auditable
 
 ## Positioning
 
-Unlike a free-roaming AI agent that decides and acts autonomously, Paymedic's LLM only ever emits a classification label — never a decision or an executed action. The rule-based decision engine is the sole authority on what happens to money, enforcing hard stopping rules (retry caps, fraud never auto-actioned). A cross-transaction safety monitor can retroactively catch and block a transaction even after an individually-reasonable bounded action already succeeded — a self-correcting mechanism, not just a static rule list.
+Unlike a free-roaming AI agent that decides and acts autonomously, Paymedic's LLM only ever emits a classification label — never a decision or an executed action. The rule-based decision engine is the sole authority on what happens to money, enforcing hard stopping rules: retry caps, fraud never auto-actioned, and a real Visa/Mastercard-grounded network compliance ceiling (~15 reattempts) enforced independently of any per-cause policy. Soft/hard decline typing is explicit, not implicit. A cross-transaction safety monitor can retroactively catch and block a transaction even after an individually-reasonable bounded action already succeeded — two independent checks now (shared payment instrument, and distinct instruments sharing an IP), not just one static rule.
 
 ## Operating Context
 
-Backend: FastAPI + SQLite, exposing `/payments`, `/pipeline`, `/audit`, `/metrics`, `/config/rules`. Frontend: Next.js + Tailwind, calling these endpoints directly. An operator generates a simulated batch, runs the pipeline, and inspects real recovered ₹, recovery rate, root-cause breakdown, and the full audit trail per transaction — including the deliberate "agent was wrong, caught itself" card-testing case that the safety monitor catches.
+Backend: FastAPI + SQLite, exposing `/payments`, `/pipeline`, `/audit`, `/metrics`, `/config/rules`. Frontend: Next.js + Tailwind, calling these endpoints directly. An operator generates a simulated batch, runs the pipeline, and inspects real recovered ₹, recovery rate, root-cause breakdown, and the full audit trail per transaction — including two deliberate "agent was wrong, caught itself" cases the safety monitor catches: the original single-instrument card-testing cluster, and a second, distinct pattern (many different card instruments sharing one IP address) that only the newer IP-based cross-signal check can see.
 
 ## Capabilities and Constraints
 
@@ -36,7 +36,7 @@ Name: "Paymedic" (fixed, do not rename). No existing logo/visual identity yet �
 
 ## Evidence on Hand
 
-Real live pipeline run data available via the running backend (100-transaction batch, seed 42): ~49% recovery rate, ~₹13.1L recovered, 0% recovery rate on `possible_fraud` cases (both obviously-flagged and disguised card-testing), median time-to-recovery ~5 minutes. These are real numbers from an actual run, not placeholders — design work should always pull live rather than hardcode even these.
+Real live pipeline run data available via the running backend (100-transaction batch, seed 42, re-run after grounding retry caps/scheduling/fraud detection in real network constraints): ~39% recovery rate, ~₹10.9L recovered, 0% recovery rate on all 13 `possible_fraud` cases (5 escalated on a plain risk-score flag, 8 caught retroactively — 4 via the single-instrument card-testing cluster, 4 via the newer distinct-instrument/shared-IP cluster), median time-to-recovery 48 hours. That last number moved deliberately from ~5 minutes in the earlier build — retries are now spaced across days (2/5/7-day backoff), matching how real dunning systems actually schedule attempts, rather than resolving a whole multi-attempt sequence in one instant. Note ~17% of rows route through live LLM classification, so re-running the same seed can shift outcome counts by roughly ±1 transaction; these are real numbers from an actual run, not placeholders — design work should always pull live rather than hardcode even these.
 
 ## Product Principles
 
