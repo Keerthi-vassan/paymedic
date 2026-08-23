@@ -19,6 +19,26 @@ ROOT_CAUSE_ACTIONS: dict[str, list[str]] = {
     "possible_fraud": [],
 }
 
+# Visa/Mastercard decline taxonomy: only "soft" declines (temporary --
+# issuer busy, insufficient funds right now) may ever be retried; "hard"
+# declines (fraud, or a decline that should redirect rather than retry the
+# same instrument) must not be. This is purely observational labeling of the
+# behavior ROOT_CAUSE_ACTIONS already encodes -- card_declined's one action
+# (suggest_alternate_method) redirects rather than retrying the same card,
+# and possible_fraud gets zero actions -- so nothing here changes what the
+# engine does, only makes the real-world rule it's already following
+# explicit and citable. Nothing enforces these two dicts stay in sync (same
+# unenforced relationship executor.SUCCESS_PROBABILITIES already has to
+# ROOT_CAUSE_ACTIONS).
+DECLINE_TYPE: dict[str, str] = {
+    "insufficient_funds": "soft",
+    "gateway_timeout": "soft",
+    "auth_failure": "soft",
+    "network_drop": "soft",
+    "card_declined": "hard",
+    "possible_fraud": "hard",
+}
+
 
 @dataclass
 class Decision:
@@ -43,6 +63,17 @@ def decide(root_cause: str, confidence: float, risk_score: float, attempts_so_fa
             action=None,
             escalate=True,
             reasoning="fraud flag -- no automated action per policy",
+        )
+
+    if attempts_so_far >= settings.network_retry_ceiling:
+        return Decision(
+            action=None,
+            escalate=True,
+            reasoning=(
+                f"attempts_so_far {attempts_so_far} >= network compliance ceiling "
+                f"{settings.network_retry_ceiling} (Visa/Mastercard card-network "
+                "reattempt-limit rule) -- no further automated retries permitted"
+            ),
         )
 
     if confidence < settings.confidence_threshold:

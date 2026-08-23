@@ -55,6 +55,21 @@ def run_transaction(
             risk_score=payment.risk_score,
             attempts_so_far=payment.total_attempts,
         )
+        attempt_number = payment.total_attempts + 1
+        # Projected delay/schedule for this attempt, computed once and reused
+        # below for both the audit trail and elapsed_minutes, so the two
+        # can't drift. None whenever escalating -- there's no action to
+        # schedule, mirroring attempt_number's own None-on-escalate below.
+        projected_delay = (
+            None
+            if decision.escalate
+            else executor.resolution_delay_minutes(decision.action, attempt_number)
+        )
+        scheduled_at = (
+            None
+            if decision.escalate
+            else payment.failed_at + timedelta(minutes=elapsed_minutes + projected_delay)
+        )
         audit.log_event(
             db,
             transaction_id=payment.transaction_id,
@@ -63,7 +78,13 @@ def run_transaction(
             reasoning=decision.reasoning,
             root_cause=classification.root_cause,
             action_taken=decision.action,
-            attempt_number=None if decision.escalate else payment.total_attempts + 1,
+            attempt_number=None if decision.escalate else attempt_number,
+            # Set once, here, and never retroactively updated -- if a later
+            # safety_override supersedes this transaction, this stays an
+            # honest historical snapshot of what was intended at decision
+            # time (mirrors the "previously-resolved sibling keeps its own
+            # resolution timing" rule in safety_monitor.py).
+            scheduled_at=scheduled_at,
         )
 
         if decision.escalate:
@@ -73,10 +94,9 @@ def run_transaction(
             db.commit()
             break
 
-        attempt_number = payment.total_attempts + 1
         outcome = executor.execute(payment.transaction_id, classification.root_cause, attempt_number)
         payment.total_attempts = attempt_number
-        elapsed_minutes += executor.resolution_delay_minutes(decision.action)
+        elapsed_minutes += projected_delay
 
         audit.log_event(
             db,

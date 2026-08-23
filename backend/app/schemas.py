@@ -13,6 +13,7 @@ class FailedPaymentOut(BaseModel):
     payment_method: str
     payment_instrument_id: str
     issuer_bank: str
+    ip_address: str
     error_code: str
     error_source: str
     error_step: str
@@ -66,6 +67,7 @@ class AuditLogOut(BaseModel):
     reasoning: str
     outcome: str | None
     attempt_number: int | None
+    scheduled_at: datetime | None
     created_at: datetime
 
 
@@ -106,8 +108,11 @@ class TimelinePointOut(BaseModel):
 
 class ConfigRulesOut(BaseModel):
     root_cause_actions: dict[str, list[str]]
+    decline_type: dict[str, str]
     confidence_threshold: float
     fraud_risk_score_threshold: float
+    network_retry_ceiling: int
     velocity_window_minutes: int
     velocity_threshold_count: int
+    ip_velocity_threshold_count: int
     llm_provider: str

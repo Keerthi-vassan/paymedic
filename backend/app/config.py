@@ -17,6 +17,20 @@ class Settings(BaseSettings):
     velocity_window_minutes: int = 60
     velocity_threshold_count: int = 3
 
+    # Second cross-transaction signal: N+ actioned transactions on DISTINCT
+    # payment instruments sharing one IP address within the same window
+    # (velocity_window_minutes) catches distributed card-testing that the
+    # instrument-based check above can't see. Distinct-instrument count, not
+    # raw row count, so one customer retrying their own card doesn't trip it.
+    ip_velocity_threshold_count: int = 3
+
+    # Visa/Mastercard cap non-fraud card reattempts at ~15 per card per
+    # merchant per rolling 30 days and fine merchants who exceed it. Per-cause
+    # caps in decision_engine.ROOT_CAUSE_ACTIONS already stay well under this,
+    # but this is the actual compliance backstop they're implicitly obeying --
+    # made explicit and enforced independently of any per-cause policy.
+    network_retry_ceiling: int = 15
+
     # Which LLM backs ambiguous-case classification. Swapping providers is a
     # one-line env var change -- each provider is a drop-in adapter behind the
     # same interface, see app/services/llm/.

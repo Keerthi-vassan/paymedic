@@ -18,6 +18,12 @@ class FailedPayment(Base):
     payment_method: Mapped[str] = mapped_column(String)
     payment_instrument_id: Mapped[str] = mapped_column(String)
     issuer_bank: Mapped[str] = mapped_column(String)
+    # Cross-transaction fraud signal alongside payment_instrument_id: the
+    # safety monitor also groups by this to catch many distinct instruments
+    # sharing one IP (a distributed card-testing pattern the instrument-based
+    # check alone can't see). Synthetic values only -- RFC 5737 TEST-NET
+    # ranges, never real-looking IPs.
+    ip_address: Mapped[str] = mapped_column(String)
 
     # Mirrors Razorpay's real Payment entity error shape: error_code is a
     # coarse enum (BAD_REQUEST_ERROR/GATEWAY_ERROR/SERVER_ERROR), error_source/
@@ -62,4 +68,11 @@ class AuditLog(Base):
     reasoning: Mapped[str] = mapped_column(String)
     outcome: Mapped[str | None] = mapped_column(String, nullable=True)  # success | fail | pending | blocked
     attempt_number: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    # When this attempt is projected to actually occur in a real system, per
+    # realistic dunning/backoff spacing (see executor.resolution_delay_minutes)
+    # -- None whenever the decision escalates, since there's no action to
+    # schedule. Set once at "decision" time and never retroactively updated,
+    # so it stays an honest historical snapshot even if a later
+    # safety_override supersedes the transaction.
+    scheduled_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)

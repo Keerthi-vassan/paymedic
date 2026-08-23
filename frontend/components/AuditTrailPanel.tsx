@@ -58,6 +58,9 @@ function EventCard({ entry }: { entry: AuditLogEntry }) {
         {entry.confidence !== null && <span>confidence: {entry.confidence.toFixed(2)}</span>}
         {entry.action_taken && <span>action: {entry.action_taken}</span>}
         {entry.attempt_number !== null && <span>attempt {entry.attempt_number}</span>}
+        {entry.scheduled_at && (
+          <span>next attempt scheduled: {new Date(entry.scheduled_at).toLocaleDateString()}</span>
+        )}
         {entry.outcome && (
           <span className={entry.outcome === "success" ? "text-status-recovered-text" : "text-muted-foreground"}>
             outcome: {entry.outcome}

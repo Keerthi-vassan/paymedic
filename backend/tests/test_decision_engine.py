@@ -60,3 +60,29 @@ def test_action_sequence_progresses_through_attempts():
 
 def test_possible_fraud_has_zero_max_attempts():
     assert ROOT_CAUSE_ACTIONS["possible_fraud"] == []
+
+
+def test_network_ceiling_escalates_regardless_of_per_cause_cap():
+    decision = decide(
+        root_cause="gateway_timeout",
+        confidence=0.95,
+        risk_score=0.1,
+        attempts_so_far=settings.network_retry_ceiling,
+    )
+    assert decision.escalate is True
+    assert "network compliance ceiling" in decision.reasoning
+
+
+def test_below_network_ceiling_but_at_per_cause_cap_still_uses_retry_cap_reasoning():
+    # gateway_timeout's own cap is 3, well under the 15-attempt network
+    # ceiling -- proves the new check doesn't preempt the existing
+    # per-cause-cap message anywhere below the real ceiling.
+    decision = decide(
+        root_cause="gateway_timeout",
+        confidence=0.95,
+        risk_score=0.1,
+        attempts_so_far=len(ROOT_CAUSE_ACTIONS["gateway_timeout"]),
+    )
+    assert decision.escalate is True
+    assert "retry cap reached" in decision.reasoning
+    assert "network compliance ceiling" not in decision.reasoning

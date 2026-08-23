@@ -13,6 +13,7 @@ def make_payment(db, **overrides):
         payment_method="card",
         payment_instrument_id="card_test",
         issuer_bank="Test Bank",
+        ip_address="203.0.113.1",
         error_code="GATEWAY_ERROR",
         error_source="gateway",
         error_step="payment_authorization",

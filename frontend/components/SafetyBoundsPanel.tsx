@@ -100,15 +100,46 @@ export function SafetyBoundsPanel({ refreshKey }: { refreshKey: number }) {
           <span className="tabular-nums text-foreground">{rules.fraud_risk_score_threshold}</span>
         </div>
         <div className="flex items-baseline justify-between gap-2">
-          <span className="text-muted-foreground">Velocity check</span>
+          <span className="text-muted-foreground">Velocity check (instrument)</span>
           <span className="tabular-nums text-foreground">
             {rules.velocity_threshold_count}+ / {rules.velocity_window_minutes}min
+          </span>
+        </div>
+        <div className="flex items-baseline justify-between gap-2">
+          <span className="text-muted-foreground">Velocity check (IP, distinct instruments)</span>
+          <span className="tabular-nums text-foreground">
+            {rules.ip_velocity_threshold_count}+ / {rules.velocity_window_minutes}min
           </span>
         </div>
         <div className="flex items-baseline justify-between gap-2">
           <span className="text-muted-foreground">Active classifier</span>
           <span className="text-foreground">{rules.llm_provider}</span>
         </div>
+      </div>
+
+      <div className="mt-1 flex flex-col gap-1.5 border-t border-border pt-3 text-sm">
+        <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+          Network compliance
+        </h3>
+        <div className="flex items-baseline justify-between gap-2">
+          <span className="text-muted-foreground">Reattempt ceiling</span>
+          <span className="tabular-nums text-foreground">
+            {rules.network_retry_ceiling} attempts / instrument
+          </span>
+        </div>
+        <div className="flex flex-col gap-1">
+          {Object.entries(rules.decline_type).map(([cause, type]) => (
+            <div key={cause} className="flex items-baseline justify-between gap-2">
+              <span className="text-muted-foreground">{cause.replace(/_/g, " ")}</span>
+              <span className={`text-right ${type === "hard" ? "text-status-blocked-text" : "text-foreground"}`}>
+                {type === "hard" ? "hard — never retried" : "soft — retry-eligible"}
+              </span>
+            </div>
+          ))}
+        </div>
+        <p className="text-xs text-muted-foreground">
+          Per Visa/Mastercard card-network reattempt-limit rules.
+        </p>
       </div>
         </motion.div>
       )}

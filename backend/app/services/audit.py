@@ -1,3 +1,5 @@
+from datetime import datetime
+
 from sqlalchemy.orm import Session
 
 from app.models import AuditLog
@@ -14,6 +16,7 @@ def log_event(
     action_taken: str | None = None,
     outcome: str | None = None,
     attempt_number: int | None = None,
+    scheduled_at: datetime | None = None,
 ) -> AuditLog:
     entry = AuditLog(
         transaction_id=transaction_id,
@@ -25,6 +28,7 @@ def log_event(
         reasoning=reasoning,
         outcome=outcome,
         attempt_number=attempt_number,
+        scheduled_at=scheduled_at,
     )
     db.add(entry)
     db.commit()

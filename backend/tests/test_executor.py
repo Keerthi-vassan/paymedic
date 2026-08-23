@@ -1,4 +1,4 @@
-from app.services.executor import SUCCESS_PROBABILITIES, execute
+from app.services.executor import SUCCESS_PROBABILITIES, execute, resolution_delay_minutes
 
 
 def test_outcome_is_deterministic_for_same_transaction_and_attempt():
@@ -36,3 +36,26 @@ def test_success_rate_roughly_matches_documented_probability():
     observed_rate = successes / 500
 
     assert abs(observed_rate - expected) < 0.1
+
+
+def test_resolution_delay_is_deterministic():
+    assert resolution_delay_minutes("retry_with_backoff", 2) == resolution_delay_minutes(
+        "retry_with_backoff", 2
+    )
+
+
+def test_retry_immediate_stays_near_instant_at_every_attempt():
+    for attempt_number in (1, 2, 3):
+        assert resolution_delay_minutes("retry_immediate", attempt_number) <= 5
+
+
+def test_retry_with_backoff_escalates_across_attempts():
+    delay_1 = resolution_delay_minutes("retry_with_backoff", 1)
+    delay_2 = resolution_delay_minutes("retry_with_backoff", 2)
+    delay_3 = resolution_delay_minutes("retry_with_backoff", 3)
+    assert delay_1 < delay_2 < delay_3
+
+
+def test_unknown_action_or_attempt_falls_back_to_zero():
+    assert resolution_delay_minutes("not_a_real_action", 1) == 0
+    assert resolution_delay_minutes("retry_with_backoff", 99) == 0

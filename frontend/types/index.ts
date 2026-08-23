@@ -7,6 +7,7 @@ export interface FailedPayment {
   payment_method: string;
   payment_instrument_id: string;
   issuer_bank: string;
+  ip_address: string;
   error_code: string;
   error_source: string;
   error_step: string;
@@ -56,6 +57,7 @@ export interface AuditLogEntry {
   reasoning: string;
   outcome: string | null;
   attempt_number: number | null;
+  scheduled_at: string | null;
   created_at: string;
 }
 
@@ -99,9 +101,12 @@ export interface TimelinePoint {
 
 export interface ConfigRules {
   root_cause_actions: Record<string, string[]>;
+  decline_type: Record<string, "hard" | "soft">;
   confidence_threshold: number;
   fraud_risk_score_threshold: number;
+  network_retry_ceiling: number;
   velocity_window_minutes: number;
   velocity_threshold_count: number;
+  ip_velocity_threshold_count: number;
   llm_provider: string;
 }
