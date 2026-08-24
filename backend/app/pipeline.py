@@ -24,7 +24,16 @@ from app.services import (
 )
 from app.services import execution as real_execution
 
-CLASSIFICATION_WORKERS = 8
+# Deliberately low. A batch only ever sends ~15-17 classifications (the
+# ambiguous rows), so extra concurrency buys a couple of seconds at most --
+# but every free-tier LLM plan caps requests per minute in roughly this
+# range, and going wider trips that cap on the very first wave. When it
+# trips, those rows 429, fail closed to zero confidence, and escalate: the
+# system stays safe, but the batch produces different numbers than the
+# README's, for a reason that has nothing to do with the recovery logic.
+# Somebody running this from a clean clone on a free key is the common case,
+# so the default is chosen for them rather than for the fastest possible run.
+CLASSIFICATION_WORKERS = 3
 
 
 @dataclass

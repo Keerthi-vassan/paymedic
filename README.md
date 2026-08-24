@@ -315,6 +315,25 @@ In the dashboard: **Generate Batch** → **Run Pipeline** → click any row for 
 audit trail. `POST /payments/generate?seed=42` reproduces the frozen batch composition
 above.
 
+### A note on free-tier LLM keys
+
+Only the ~17% ambiguous rows call the LLM — about 15-17 requests per batch — and
+classification is issued 3-at-a-time (`CLASSIFICATION_WORKERS` in
+`backend/app/pipeline.py`) specifically to stay inside the per-minute caps free API
+tiers impose. On a free key you may still see some rows rate-limited, particularly if
+you run several batches in a row and exhaust a daily quota.
+
+**Nothing breaks when that happens, and it is not hidden.** A failed classification
+fails closed: zero confidence, escalated for human review, never guessed. The
+**Classifier Accuracy** panel reports those rows separately as `LLM call failed` and
+shows a warning naming the count, so a degraded run is always distinguishable from a
+healthy one rather than looking like ordinary escalations.
+
+It does mean the outcome numbers for that run won't match the ones above, since those
+transactions never got classified. For figures that reproduce, use a billing-enabled
+key or switch `LLM_PROVIDER` to any of the other supported adapters — the provider is
+a one-line env change.
+
 Enabling real execution: set `RAZORPAY_EXECUTION_ENABLED=true` and both
 `RAZORPAY_KEY_ID`/`RAZORPAY_KEY_SECRET` (test-mode keys from your Razorpay dashboard)
 in `.env` before `docker compose up`. A second **Run Real Transactions** button
