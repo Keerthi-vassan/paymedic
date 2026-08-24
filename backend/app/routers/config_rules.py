@@ -18,6 +18,10 @@ def get_rules():
         velocity_window_minutes=settings.velocity_window_minutes,
         velocity_threshold_count=settings.velocity_threshold_count,
         ip_velocity_threshold_count=settings.ip_velocity_threshold_count,
+        quiet_hours_start=settings.quiet_hours_start,
+        quiet_hours_end=settings.quiet_hours_end,
+        payday_lookahead_days=settings.payday_lookahead_days,
+        webhook_ingestion_enabled=bool(settings.razorpay_webhook_secret),
         llm_provider=settings.llm_provider,
         razorpay_execution_enabled=settings.razorpay_execution_enabled,
     )

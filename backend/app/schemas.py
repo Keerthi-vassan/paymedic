@@ -23,6 +23,7 @@ class FailedPaymentOut(BaseModel):
     latency_ms: int
     risk_score: float
     true_root_cause: str
+    ingest_source: str
     status: str
     final_action: str | None
     total_attempts: int
@@ -77,6 +78,7 @@ class AuditLogOut(BaseModel):
     gateway_order_id: str | None
     gateway_payment_id: str | None
     gateway_status: str | None
+    notification_body: str | None
 
 
 class AuditListResponse(BaseModel):
@@ -94,6 +96,8 @@ class MetricsSummaryOut(BaseModel):
     escalation_rate: float
     blocked_rate: float
     false_action_rate: float
+    false_action_count: int
+    safety_override_rate: float
     fraud_block_rate: float
     avg_time_to_recovery_minutes: float | None
     median_time_to_recovery_minutes: float | None
@@ -116,6 +120,44 @@ class TimelinePointOut(BaseModel):
     cumulative_recovered_amount: int  # paise
 
 
+class ClassifierPathRowOut(BaseModel):
+    path: str
+    total: int
+    correct: int
+    accuracy: float
+
+
+class ConfusionRowOut(BaseModel):
+    true_root_cause: str
+    total: int
+    predicted: dict[str, int]
+
+
+class CalibrationBucketOut(BaseModel):
+    label: str
+    lower: float
+    upper: float
+    total: int
+    correct: int
+    accuracy: float
+    mean_confidence: float
+
+
+class ClassifierMetricsOut(BaseModel):
+    total_classified: int
+    graded: int
+    ungraded: int
+    overall_accuracy: float
+    paths: list[ClassifierPathRowOut]
+    confusion: list[ConfusionRowOut]
+    calibration: list[CalibrationBucketOut]
+    confidence_threshold: float
+    above_threshold_total: int
+    above_threshold_accuracy: float
+    below_threshold_total: int
+    below_threshold_accuracy: float
+
+
 class ConfigRulesOut(BaseModel):
     root_cause_actions: dict[str, list[str]]
     decline_type: dict[str, str]
@@ -125,5 +167,9 @@ class ConfigRulesOut(BaseModel):
     velocity_window_minutes: int
     velocity_threshold_count: int
     ip_velocity_threshold_count: int
+    quiet_hours_start: int
+    quiet_hours_end: int
+    payday_lookahead_days: int
     llm_provider: str
+    webhook_ingestion_enabled: bool
     razorpay_execution_enabled: bool
