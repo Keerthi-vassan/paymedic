@@ -15,6 +15,10 @@ services:
       - RAZORPAY_KEY_ID=${RAZORPAY_KEY_ID}
       - RAZORPAY_KEY_SECRET=${RAZORPAY_KEY_SECRET}
       - RAZORPAY_REAL_TXN_COUNT=${RAZORPAY_REAL_TXN_COUNT:-4}
+      # Empty by default: /webhooks/razorpay refuses every delivery rather
+      # than accepting unverified ones (see app/routers/webhooks.py).
+      - RAZORPAY_WEBHOOK_SECRET=${RAZORPAY_WEBHOOK_SECRET}
+      - NOTIFICATION_LLM_ENABLED=${NOTIFICATION_LLM_ENABLED:-true}
       - DATABASE_URL=sqlite:////app/data/recovery.db
       - FRONTEND_ORIGIN=http://localhost:3000
 

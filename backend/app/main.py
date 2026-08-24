@@ -2,7 +2,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import settings
-from app.routers import audit, config_rules, metrics, payments, pipeline
+from app.routers import audit, config_rules, metrics, payments, pipeline, webhooks
 from app.services.execution import harness as execution_harness
 
 app = FastAPI(title="Revenue Recovery Agent")
@@ -20,6 +20,7 @@ app.include_router(pipeline.router)
 app.include_router(audit.router)
 app.include_router(metrics.router)
 app.include_router(config_rules.router)
+app.include_router(webhooks.router)
 app.include_router(execution_harness.router)
 
 

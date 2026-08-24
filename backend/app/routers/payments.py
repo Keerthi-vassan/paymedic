@@ -4,7 +4,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 
 from app.db import Base, engine, get_db
-from app.models import AuditLog, FailedPayment
+from app.models import FailedPayment
 from app.schemas import FailedPaymentOut, GenerateBatchResponse, PaymentsListResponse
 from scripts.generate_dataset import generate_failed_payments
 
@@ -13,6 +13,12 @@ router = APIRouter(prefix="/payments", tags=["payments"])
 
 @router.post("/generate", response_model=GenerateBatchResponse)
 def generate(count: int = 100, seed: int | None = None, db: Session = Depends(get_db)):
+    # Dropped rather than only emptied: the batch is regenerated from scratch
+    # every time anyway, and recreating the tables means a schema change ships
+    # without a migration step or a stale local recovery.db breaking startup.
+    # This also clears any webhook-ingested rows, which is the intended
+    # semantics of "Generate Batch" -- it resets the whole working set.
+    Base.metadata.drop_all(bind=engine)
     Base.metadata.create_all(bind=engine)
 
     # Omitting seed gives a genuinely fresh batch each call; passing seed=42
@@ -21,11 +27,11 @@ def generate(count: int = 100, seed: int | None = None, db: Session = Depends(ge
         seed = random.SystemRandom().randint(0, 2**31 - 1)
 
     rows = generate_failed_payments(count=count, seed=seed)
-    # Transaction IDs are deterministic per (count, seed), so a fresh batch can
-    # reuse an id from a previous run -- clear its audit history too, or stale
-    # rows from that earlier run would leak into the new one's trail.
-    db.query(AuditLog).delete()
-    db.query(FailedPayment).delete()
+    # No explicit row deletion needed -- drop_all above already took both
+    # tables with it, including the audit history. That matters because
+    # transaction IDs are deterministic per (count, seed), so a fresh batch
+    # can reuse an id from a previous run and would otherwise inherit that
+    # run's audit trail.
     db.bulk_insert_mappings(FailedPayment, rows)
     db.commit()
 
