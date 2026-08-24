@@ -73,6 +73,18 @@ class Settings(BaseSettings):
     llm_timeout_seconds: float = 20.0
     llm_max_retries: int = 1
 
+    # How many times each ambiguous transaction is classified. The LLM's own
+    # stated confidence is a poor predictor of whether it is right (~0.627
+    # AUROC, barely above chance); how often independent samples agree with
+    # each other is substantially better (0.65-0.74) and costs nothing but
+    # repeated calls. See classifier._classify_by_consensus.
+    #
+    # Set to 1 to reproduce the previous single-sample behaviour exactly --
+    # useful for an honest before/after comparison via /metrics/classifier.
+    # Note the cost is linear: 3 samples means 3x the requests on the ~17% of
+    # rows that reach the LLM at all, which matters on a free-tier key.
+    classification_samples: int = 3
+
     anthropic_api_key: str = ""
     anthropic_model: str = "claude-haiku-4-5-20251001"
 

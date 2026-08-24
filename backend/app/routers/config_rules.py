@@ -23,5 +23,6 @@ def get_rules():
         payday_lookahead_days=settings.payday_lookahead_days,
         webhook_ingestion_enabled=bool(settings.razorpay_webhook_secret),
         llm_provider=settings.llm_provider,
+        classification_samples=settings.classification_samples,
         razorpay_execution_enabled=settings.razorpay_execution_enabled,
     )

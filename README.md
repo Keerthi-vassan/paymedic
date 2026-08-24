@@ -69,7 +69,8 @@ flowchart LR
 - **Classification** — deterministic rules cover most transactions; an LLM only ever
   labels the ambiguous ~17%, from structured fields (error code/source/step/amount/
   attempt/latency/risk_score), **never raw free text**, and only ever emits a
-  classification label — never a decision or an action.
+  classification label — never a decision or an action. Its confidence is **not**
+  taken from the model's own claim about itself — see [Confidence](#confidence-is-measured-not-asserted).
 - **Decision** — a pure function, no LLM in the loop, that only ever sees
   `(root_cause, confidence, risk_score, attempts_so_far)`. This is the sole authority
   on what happens to money.
@@ -97,7 +98,7 @@ LLM, and are visible live in the dashboard's Safety Bounds panel (pulled from
 |---|---|
 | Fraud never auto-retried | `risk_score >= 0.85` or `root_cause == possible_fraud` → escalate, 0 attempts ever |
 | Network compliance ceiling | `attempts_so_far >= 15` → escalate, citing the real Visa/Mastercard ~15-attempt/30-day reattempt-limit rule |
-| Low-confidence classification | `confidence < 0.6` → escalate to human review, never guessed |
+| Low-confidence classification | `confidence < 0.6` → escalate to human review, never guessed — and on the LLM path that confidence is inter-sample agreement, not the model's self-report |
 | Per-cause retry caps | e.g. `gateway_timeout` capped at 3 attempts, `card_declined` at 1 (redirect, never a same-card retry) |
 | Soft/hard decline typing | hard declines (`card_declined`, `possible_fraud`) get zero same-instrument retries, explicit and citable, not just implicit |
 | Cross-transaction fraud check | two independent signals — shared payment instrument, and distinct instruments sharing one IP — can retroactively block a transaction even after an individually-reasonable action already "succeeded" |
@@ -146,6 +147,57 @@ the other 96 transactions whether the feature is on or off; `POST /pipeline/run-
 took ~70s for the 4 real candidates, all completing end-to-end against Razorpay's
 test-mode sandbox with genuine `order_id`/`payment_id`/gateway status each time. The
 "Run Real Transactions" button only appears when `RAZORPAY_EXECUTION_ENABLED=true`.
+
+## Confidence is measured, not asserted
+
+The decision engine gates on `confidence >= 0.6`. That gate is only worth having if
+the number behind it means something.
+
+Asking a model "how confident are you?" produces a number it simply writes. Published
+evaluations put self-reported LLM confidence at roughly **0.627 AUROC** at predicting
+its own errors — barely above the 0.5 of a coin flip. A wrong-but-confident answer
+clears a self-reported gate exactly as easily as a right one.
+
+So the LLM path doesn't trust it. Each ambiguous transaction is classified
+**`CLASSIFICATION_SAMPLES` times (default 3)**, and confidence is scored by how often
+those independent samples agree with each other — a substantially stronger signal
+(**0.65–0.74 AUROC**) that needs no logprobs, no special model access, and no training.
+Just running the same call more than once.
+
+The reported confidence is the **more pessimistic of the two signals**:
+
+```
+confidence = min(agreement, mean self-report among the winning votes)
+```
+
+Neither can inflate the other:
+
+| The model is… | Agreement | Self-report | Confidence | Outcome |
+|---|---|---|---|---|
+| consistent and sure | 1.00 | 0.90 | **0.90** | acted on |
+| consistent but hesitant | 1.00 | 0.30 | **0.30** | escalated |
+| **emphatic but inconsistent** | 0.33 | 0.99 | **0.33** | **escalated** |
+| split 2–1 | 0.67 | 0.95 | **0.67** | acted on, narrowly |
+
+The third row is the case this exists for. Under self-report alone, a model that answers
+`gateway_timeout`, then `network_drop`, then `card_declined` — insisting on 0.99 every
+time — sails through the gate and a bounded action gets taken on a coin flip. Under
+agreement it escalates to a human.
+
+Ties escalate for free: 3 samples with 3 different answers is 0.33; 4 split 2–2 is 0.50.
+Both fall under the threshold with no special-casing.
+
+**This is measurable, not just assertable.** Setting `CLASSIFICATION_SAMPLES=1`
+reproduces the previous single-sample behaviour exactly (agreement becomes trivially
+1.0, so confidence collapses to the self-reported number). Run the same batch both ways
+and compare the calibration table in `GET /metrics/classifier` — that is the honest
+before/after, on your own data.
+
+Two caveats stated plainly: it costs **3× the LLM requests** on the ~17% of rows that
+reach the LLM, and it depends on the provider sampling non-deterministically. All four
+adapters use their provider's default temperature, which is non-zero for every one of
+them — pinning temperature to 0 would make every sample identical and this measurement
+meaningless.
 
 ## Retry timing
 
@@ -317,10 +369,13 @@ above.
 
 ### A note on free-tier LLM keys
 
-Only the ~17% ambiguous rows call the LLM — about 15-17 requests per batch — and
-classification is issued 3-at-a-time (`CLASSIFICATION_WORKERS` in
-`backend/app/pipeline.py`) specifically to stay inside the per-minute caps free API
-tiers impose. On a free key you may still see some rows rate-limited, particularly if
+Only the ~17% ambiguous rows call the LLM, and each is classified
+`CLASSIFICATION_SAMPLES` times (default 3) for the agreement scoring described above —
+so roughly 45-50 requests per batch. Classification is issued 3-at-a-time
+(`CLASSIFICATION_WORKERS` in `backend/app/pipeline.py`) specifically to stay inside the
+per-minute caps free API tiers impose. Setting `CLASSIFICATION_SAMPLES=1` cuts the
+request count by two-thirds if you are quota-constrained, at the cost of falling back
+to self-reported confidence. On a free key you may still see some rows rate-limited, particularly if
 you run several batches in a row and exhaust a daily quota.
 
 **Nothing breaks when that happens, and it is not hidden.** A failed classification
@@ -355,7 +410,7 @@ docker build -t paymedic-backend backend
 docker run --rm paymedic-backend python -m pytest -q
 ```
 
-93 backend tests. They also run in CI on every push and pull request
+101 backend tests. They also run in CI on every push and pull request
 (`.github/workflows/ci.yml`), alongside frontend typecheck, lint and build. No API keys
 are set there and none are needed — every test that touches a provider stubs it, so a
 test that silently started making live calls would fail.
@@ -364,7 +419,7 @@ test that silently started making live calls would fail.
 
 ```
 backend/
-  app/services/classifier.py       root-cause classification (rules + LLM fallback)
+  app/services/classifier.py       root-cause classification + self-consistency scoring
   app/services/decision_engine.py  bounded actions + stopping rules, pure function
   app/services/executor.py         simulated outcome (hash-roll) + attempt spacing
   app/services/retry_scheduler.py  when a scheduled attempt actually lands
@@ -397,11 +452,12 @@ Stated plainly, not defensively — see `docs/PLAN.md` for the fuller history:
 - **LLM confidence is self-reported and uncalibrated.** A wrong-but-confident answer
   passes the `confidence >= 0.6` gate exactly as easily as a right one. The system
   fails *closed* on outright failures, but has no mechanism to catch a confidently
-  wrong success. The calibration table now makes this visible per batch instead of
-  leaving it to be assumed. The known cheap fix — self-consistency, i.e. sampling the
-  classification more than once and using inter-run agreement instead of the model's
-  self-report, which is a substantially stronger failure signal — is **designed but
-  not implemented**, and is the single largest remaining gap.
+  wrong success. This is now **partly addressed**: confidence on the LLM path is scored
+  by inter-sample agreement rather than self-report (see above), which catches the
+  confidently-inconsistent case. It does not catch a model that is *consistently* wrong
+  — three samples agreeing on the same wrong answer still clears the gate — and
+  agreement at 0.65–0.74 AUROC is better than chance, not good. The rule path's
+  confidence is still a hardcoded `0.95` constant that varies with nothing.
 - Simulated execution outcomes are a documented probability table, not real retry
   semantics or real customer behaviour — the real-execution feature closes part of
   this gap for a small subset, not all of it. Retry *timing* is now grounded in

@@ -19,6 +19,7 @@ services:
       # than accepting unverified ones (see app/routers/webhooks.py).
       - RAZORPAY_WEBHOOK_SECRET=${RAZORPAY_WEBHOOK_SECRET}
       - NOTIFICATION_LLM_ENABLED=${NOTIFICATION_LLM_ENABLED:-true}
+      - CLASSIFICATION_SAMPLES=${CLASSIFICATION_SAMPLES:-3}
       - DATABASE_URL=sqlite:////app/data/recovery.db
       - FRONTEND_ORIGIN=http://localhost:3000
 

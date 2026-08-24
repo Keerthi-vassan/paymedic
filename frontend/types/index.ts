@@ -145,6 +145,9 @@ export interface ConfigRules {
   quiet_hours_end: number;
   payday_lookahead_days: number;
   llm_provider: string;
+  /** How many times each ambiguous transaction is classified. >1 means
+   * confidence is scored by inter-sample agreement, not self-report. */
+  classification_samples: number;
   razorpay_execution_enabled: boolean;
   webhook_ingestion_enabled: boolean;
 }

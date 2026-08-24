@@ -171,5 +171,6 @@ class ConfigRulesOut(BaseModel):
     quiet_hours_end: int
     payday_lookahead_days: int
     llm_provider: str
+    classification_samples: int
     webhook_ingestion_enabled: bool
     razorpay_execution_enabled: bool

@@ -257,10 +257,28 @@ asserts against.
 
 **Backend: 93 tests passing** (was 44).
 
-**Deliberately not done:** self-consistency on the LLM path (sampling the classification
-more than once and using inter-run agreement instead of the model's self-reported
-confidence, a substantially stronger failure signal). This remains the single largest
-known gap and is called out as such in the README.
+**Follow-up in the same session: self-consistency, built.** Initially descoped again,
+then picked up -- it is the only change that turns the confidence number into a
+measurement rather than an assertion, and it is the sharpest question the submission
+invites ("how is confidence even generated?").
+
+Each ambiguous transaction is now classified `CLASSIFICATION_SAMPLES` times (default 3)
+and confidence is scored by inter-sample agreement, at
+`min(agreement, mean self-report among the winning votes)` -- the more pessimistic of
+the two signals, so neither can inflate the other. The case it exists to catch is a
+model that answers differently every time while insisting on 0.99 each time: under
+self-report it clears the 0.6 gate and a bounded action is taken on a coin flip; under
+agreement it escalates. Ties escalate with no special-casing (3 samples / 3 answers =
+0.33; 4 split 2-2 = 0.50).
+
+`CLASSIFICATION_SAMPLES=1` reproduces the old single-sample behaviour exactly, which is
+what makes the before/after comparison honest -- run the same batch both ways and diff
+the calibration table. Costs 3x the requests on the ~17% of rows that reach the LLM,
+and depends on the provider sampling non-deterministically (all four adapters use
+non-zero default temperature; pinning it to 0 makes agreement trivially 1.0 and the
+measurement meaningless). Both caveats are in the README.
+
+**Backend: 101 tests passing.**
 
 **Metrics need re-freezing.** The `seed=42` run recorded in the README was made while
 the provider quota was exhausted, so it reflects a degraded classifier. Re-run and

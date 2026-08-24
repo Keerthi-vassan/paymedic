@@ -115,6 +115,19 @@ export function SafetyBoundsPanel({ refreshKey }: { refreshKey: number }) {
           <span className="text-muted-foreground">Active classifier</span>
           <span className="text-foreground">{rules.llm_provider}</span>
         </div>
+        <div className="flex items-baseline justify-between gap-2">
+          <span
+            className="text-muted-foreground"
+            title="Self-reported LLM confidence predicts its own errors at roughly 0.627 AUROC -- barely above chance. How often independent samples agree is a substantially stronger signal, and costs only repeated calls."
+          >
+            Confidence scoring
+          </span>
+          <span className="text-right text-foreground">
+            {rules.classification_samples > 1
+              ? `${rules.classification_samples}-sample agreement`
+              : "self-reported (single sample)"}
+          </span>
+        </div>
       </div>
 
       <div className="mt-1 flex flex-col gap-1.5 border-t border-border pt-3 text-sm">
