@@ -49,6 +49,16 @@ jobs:
         working-directory: frontend
         run: npm ci
 
+      # Next generates route/layout types (LayoutProps and friends) into
+      # .next/types during a build, and app/layout.tsx references them. On a
+      # clean checkout there is no .next yet, so a standalone tsc fails on
+      # types that are perfectly valid locally where a previous build left
+      # them behind. typegen produces just those definitions without paying
+      # for a full build.
+      - name: Generate Next route types
+        working-directory: frontend
+        run: npx next typegen
+
       - name: Typecheck
         working-directory: frontend
         run: npx tsc --noEmit
