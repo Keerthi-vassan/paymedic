@@ -12,6 +12,7 @@ const EVENT_LABELS: Record<string, string> = {
   classification: "Classification",
   decision: "Decision",
   action_execution: "Action executed",
+  notification: "Customer notified",
   safety_override: "Safety override",
 };
 
@@ -61,6 +62,14 @@ function EventCard({ entry }: { entry: AuditLogEntry }) {
       </div>
 
       <p className="mt-1 text-sm text-foreground">{entry.reasoning}</p>
+
+      {/* The exact copy that went out, quoted rather than summarised -- a
+          reminder an operator can't read the text of isn't auditable. */}
+      {entry.notification_body && (
+        <blockquote className="mt-2 border-l-2 border-border pl-2.5 text-sm italic text-muted-foreground">
+          {entry.notification_body}
+        </blockquote>
+      )}
 
       <div className="mt-1.5 flex flex-wrap gap-x-3 gap-y-1 text-xs text-muted-foreground">
         {entry.root_cause && <span>root cause: {entry.root_cause}</span>}

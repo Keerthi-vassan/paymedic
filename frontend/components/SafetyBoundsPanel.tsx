@@ -141,6 +141,47 @@ export function SafetyBoundsPanel({ refreshKey }: { refreshKey: number }) {
           Per Visa/Mastercard card-network reattempt-limit rules.
         </p>
       </div>
+
+      <div className="mt-1 flex flex-col gap-1.5 border-t border-border pt-3 text-sm">
+        <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+          Retry timing
+        </h3>
+        <div className="flex items-baseline justify-between gap-2">
+          <span className="text-muted-foreground">Quiet window (no attempts)</span>
+          <span className="tabular-nums text-foreground">
+            {String(rules.quiet_hours_start).padStart(2, "0")}:00 –{" "}
+            {String(rules.quiet_hours_end).padStart(2, "0")}:00
+          </span>
+        </div>
+        <div className="flex items-baseline justify-between gap-2">
+          <span className="text-muted-foreground">Salary-credit alignment</span>
+          <span className="tabular-nums text-foreground">
+            within {rules.payday_lookahead_days} days
+          </span>
+        </div>
+        <p className="text-xs text-muted-foreground">
+          Authorization success rates swing roughly 15% with time of day, and insufficient-funds
+          recovers on balance refill rather than on repetition — so retries are placed, not just
+          counted.
+        </p>
+      </div>
+
+      <div className="mt-1 flex flex-col gap-1.5 border-t border-border pt-3 text-sm">
+        <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+          Ingestion
+        </h3>
+        <div className="flex items-baseline justify-between gap-2">
+          <span className="text-muted-foreground">Razorpay webhook endpoint</span>
+          <span className={rules.webhook_ingestion_enabled ? "text-status-recovered-text" : "text-muted-foreground"}>
+            {rules.webhook_ingestion_enabled ? "signature-verified, live" : "not configured"}
+          </span>
+        </div>
+        <p className="text-xs text-muted-foreground">
+          {rules.webhook_ingestion_enabled
+            ? "Real payment.failed deliveries are HMAC-verified and enter the same pipeline as generated rows."
+            : "No webhook secret set, so deliveries are refused rather than accepted unverified."}
+        </p>
+      </div>
         </motion.div>
       )}
     </AnimatePresence>

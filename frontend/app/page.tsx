@@ -8,6 +8,7 @@ import { formatCurrency } from "@/lib/format";
 import { ActionsTakenTable } from "@/components/ActionsTakenTable";
 import { AuditTrailPanel } from "@/components/AuditTrailPanel";
 import { FailedPaymentsFeed } from "@/components/FailedPaymentsFeed";
+import { ClassifierAccuracyPanel } from "@/components/ClassifierAccuracyPanel";
 import { MetricsSummary } from "@/components/MetricsSummary";
 import { RootCauseBreakdown } from "@/components/RootCauseBreakdown";
 import { SafetyBoundsPanel } from "@/components/SafetyBoundsPanel";
@@ -103,8 +104,9 @@ export default function Home() {
           <MetricsSummary refreshKey={refreshKey} />
 
           <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
-            <div className="lg:col-span-2">
+            <div className="flex flex-col gap-4 lg:col-span-2">
               <RootCauseBreakdown refreshKey={refreshKey} />
+              <ClassifierAccuracyPanel refreshKey={refreshKey} />
             </div>
             <SafetyBoundsPanel refreshKey={refreshKey} />
           </div>

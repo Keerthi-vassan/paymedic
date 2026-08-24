@@ -1,5 +1,6 @@
 import type {
   AuditListResponse,
+  ClassifierMetrics,
   ConfigRules,
   GenerateBatchResponse,
   MetricsSummary,
@@ -68,6 +69,10 @@ export function getRootCauseBreakdown() {
 
 export function getTimeline() {
   return apiFetch<TimelinePoint[]>("/metrics/timeline");
+}
+
+export function getClassifierMetrics() {
+  return apiFetch<ClassifierMetrics>("/metrics/classifier");
 }
 
 export function getConfigRules() {

@@ -163,6 +163,14 @@ export function FailedPaymentsFeed({
                           <div className="flex items-center gap-2">
                             <StatusBadge status={p.status} />
                             {p.is_real && p.real_execution_verified && <RealBadge />}
+                            {p.ingest_source === "razorpay_webhook" && (
+                              <span
+                                className="inline-flex items-center rounded-full bg-surface-muted px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground"
+                                title="Arrived as a signature-verified Razorpay payment.failed webhook, not from the generator. Carries no ground-truth label, so it is excluded from accuracy metrics."
+                              >
+                                Webhook
+                              </span>
+                            )}
                           </div>
                         </td>
                         <td className="py-1.5 text-xs text-muted-foreground">

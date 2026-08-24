@@ -16,7 +16,11 @@ export interface FailedPayment {
   network_type: string;
   latency_ms: number;
   risk_score: number;
+  /** "unknown" for webhook-ingested rows -- a real event carries no label,
+   * so those rows are excluded from every accuracy and false-action figure. */
   true_root_cause: string;
+  /** "synthetic" | "razorpay_webhook" -- where this row entered the system. */
+  ingest_source: string;
   status: string;
   final_action: string | null;
   total_attempts: number;
@@ -74,6 +78,9 @@ export interface AuditLogEntry {
   gateway_order_id: string | null;
   gateway_payment_id: string | null;
   gateway_status: string | null;
+  /** Only populated on "notification" events: the exact customer-facing copy
+   * a send_reminder action put out. */
+  notification_body: string | null;
 }
 
 export interface AuditListResponse {
@@ -92,7 +99,14 @@ export interface MetricsSummary {
   recovery_rate: number;
   escalation_rate: number;
   blocked_rate: number;
+  /** Actions ground truth says should never have been taken -- a retry against
+   * a true fraud case or a true hard decline. Graded against true_root_cause,
+   * so a miss counts whether or not the safety monitor caught it. */
   false_action_rate: number;
+  false_action_count: number;
+  /** How much of what was actioned the safety monitor later retracted. This
+   * measures the monitor's catch volume, NOT the system's error rate. */
+  safety_override_rate: number;
   fraud_block_rate: number;
   avg_time_to_recovery_minutes: number | null;
   median_time_to_recovery_minutes: number | null;
@@ -127,6 +141,51 @@ export interface ConfigRules {
   velocity_window_minutes: number;
   velocity_threshold_count: number;
   ip_velocity_threshold_count: number;
+  quiet_hours_start: number;
+  quiet_hours_end: number;
+  payday_lookahead_days: number;
   llm_provider: string;
   razorpay_execution_enabled: boolean;
+  webhook_ingestion_enabled: boolean;
+}
+
+export interface ClassifierPathRow {
+  /** "rule_engine" | "llm" | "llm_error" */
+  path: string;
+  total: number;
+  correct: number;
+  accuracy: number;
+}
+
+export interface ConfusionRow {
+  true_root_cause: string;
+  total: number;
+  /** Predicted label -> count. Only non-zero entries are present. */
+  predicted: Record<string, number>;
+}
+
+export interface CalibrationBucket {
+  label: string;
+  lower: number;
+  upper: number;
+  total: number;
+  correct: number;
+  accuracy: number;
+  mean_confidence: number;
+}
+
+export interface ClassifierMetrics {
+  total_classified: number;
+  /** Rows with usable ground truth; webhook rows have none and are excluded. */
+  graded: number;
+  ungraded: number;
+  overall_accuracy: number;
+  paths: ClassifierPathRow[];
+  confusion: ConfusionRow[];
+  calibration: CalibrationBucket[];
+  confidence_threshold: number;
+  above_threshold_total: number;
+  above_threshold_accuracy: number;
+  below_threshold_total: number;
+  below_threshold_accuracy: number;
 }
