@@ -25,6 +25,7 @@ Backend: FastAPI + SQLite, exposing `/payments`, `/pipeline`, `/audit`, `/metric
 ## Capabilities and Constraints
 
 - Live data only: every number shown must come from a real API response; nothing hardcoded or fabricated for visual polish, even for otherwise-empty states.
+- Optional real Razorpay test-mode execution (`RAZORPAY_EXECUTION_ENABLED`, off by default): a small fixed-count subset of each batch has its first bounded action attempted as a genuine Razorpay test-mode transaction (real order, real browser-driven checkout, real gateway status) rather than a simulated hash-roll, with the audit trail marking exactly which — see `docs/PLAN.md` Phase 6.6.
 - LLM provider is swappable at the backend (Anthropic/OpenAI/Gemini/Sarvam) via env var; the dashboard shows which is active via `/config/rules` but has no provider-specific UI beyond that.
 - No authentication/multi-tenancy in scope — single operator view.
 - Transaction statuses: `open`, `recovered`, `escalated`, `blocked` (`blocked` = retroactive safety-monitor override, distinct from an ordinary rule-based `escalated`) — these four must stay visually and semantically distinct.

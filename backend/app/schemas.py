@@ -28,6 +28,10 @@ class FailedPaymentOut(BaseModel):
     total_attempts: int
     recovered_amount: int  # paise
     resolved_at: datetime | None
+    is_real: bool
+    real_execution_verified: bool
+    gateway_order_id: str | None
+    gateway_payment_id: str | None
 
 
 class GenerateBatchResponse(BaseModel):
@@ -69,6 +73,10 @@ class AuditLogOut(BaseModel):
     attempt_number: int | None
     scheduled_at: datetime | None
     created_at: datetime
+    execution_source: str | None
+    gateway_order_id: str | None
+    gateway_payment_id: str | None
+    gateway_status: str | None
 
 
 class AuditListResponse(BaseModel):

@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from sqlalchemy import DateTime, Float, ForeignKey, Integer, String
+from sqlalchemy import Boolean, DateTime, Float, ForeignKey, Integer, String
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db import Base
@@ -50,6 +50,19 @@ class FailedPayment(Base):
     recovered_amount: Mapped[int] = mapped_column(Integer, default=0)
     resolved_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
 
+    # Marks this row as one of the small, fixed-count subset (see
+    # RAZORPAY_REAL_TXN_COUNT) whose first action is attempted against a real
+    # Razorpay test-mode order instead of the simulated hash-roll. Set only at
+    # generation time, invisible to decision_engine/safety_monitor.
+    is_real: Mapped[bool] = mapped_column(Boolean, default=False)
+    # True only once a real gateway response was actually obtained for this
+    # transaction -- a real candidate whose execution attempt fell back to
+    # simulated stays is_real=True, real_execution_verified=False, and must
+    # read as simulated everywhere in the UI.
+    real_execution_verified: Mapped[bool] = mapped_column(Boolean, default=False)
+    gateway_order_id: Mapped[str | None] = mapped_column(String, nullable=True)
+    gateway_payment_id: Mapped[str | None] = mapped_column(String, nullable=True)
+
 
 class AuditLog(Base):
     __tablename__ = "audit_log"
@@ -76,3 +89,13 @@ class AuditLog(Base):
     # safety_override supersedes the transaction.
     scheduled_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+    # Populated only on action_execution events: which path actually produced
+    # this outcome ("simulated" | "real_razorpay") and, when real, the raw
+    # gateway references/status -- lets the audit trail and dashboard tell a
+    # real Razorpay-verified outcome apart from the simulated majority instead
+    # of blending them invisibly.
+    execution_source: Mapped[str | None] = mapped_column(String, nullable=True)
+    gateway_order_id: Mapped[str | None] = mapped_column(String, nullable=True)
+    gateway_payment_id: Mapped[str | None] = mapped_column(String, nullable=True)
+    gateway_status: Mapped[str | None] = mapped_column(String, nullable=True)

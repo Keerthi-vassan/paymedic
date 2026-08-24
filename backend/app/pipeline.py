@@ -11,8 +11,10 @@ from datetime import timedelta
 
 from sqlalchemy.orm import Session
 
+from app.config import settings
 from app.models import FailedPayment
 from app.services import audit, classifier, decision_engine, executor, safety_monitor
+from app.services import execution as real_execution
 
 CLASSIFICATION_WORKERS = 8
 
@@ -94,20 +96,50 @@ def run_transaction(
             db.commit()
             break
 
-        outcome = executor.execute(payment.transaction_id, classification.root_cause, attempt_number)
+        # Only the FIRST bounded action of a small, fixed-count real-candidate
+        # subset (FailedPayment.is_real) goes through an actual Razorpay
+        # test-mode transaction -- every later retry on that same
+        # transaction, and every other transaction, uses the simulated path.
+        # A broken/timed-out real attempt falls back to the same simulated
+        # outcome transparently (see execution/__init__.py's fallback).
+        use_real = settings.razorpay_execution_enabled and payment.is_real and attempt_number == 1
+        if use_real:
+            real_result = real_execution.attempt_real_execution(payment, classification.root_cause, attempt_number)
+            outcome = real_result.outcome
+            payment.real_execution_verified = real_result.verified
+            payment.gateway_order_id = real_result.gateway_order_id
+            payment.gateway_payment_id = real_result.gateway_payment_id
+            execution_source = real_result.execution_source
+            gateway_status = real_result.gateway_status
+        else:
+            outcome = executor.execute(payment.transaction_id, classification.root_cause, attempt_number)
+            execution_source = "simulated"
+            gateway_status = None
+
         payment.total_attempts = attempt_number
         elapsed_minutes += projected_delay
+
+        reasoning = f"executed {decision.action} (attempt {attempt_number})"
+        if use_real:
+            reasoning += (
+                f" -- real Razorpay test-mode transaction ({execution_source}"
+                f"{', verified' if payment.real_execution_verified else ', fell back to simulated'})"
+            )
 
         audit.log_event(
             db,
             transaction_id=payment.transaction_id,
             event_type="action_execution",
             source="executor",
-            reasoning=f"executed {decision.action} (attempt {attempt_number})",
+            reasoning=reasoning,
             root_cause=classification.root_cause,
             action_taken=decision.action,
             outcome=outcome,
             attempt_number=attempt_number,
+            execution_source=execution_source,
+            gateway_order_id=payment.gateway_order_id if use_real else None,
+            gateway_payment_id=payment.gateway_payment_id if use_real else None,
+            gateway_status=gateway_status,
         )
 
         db.commit()

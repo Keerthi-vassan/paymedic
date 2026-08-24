@@ -314,6 +314,62 @@ def _make_network_ceiling_demo_row(rng: random.Random, now: datetime) -> dict:
     }
 
 
+# Root causes eligible to be a "real" candidate: soft declines only, never
+# possible_fraud/card_declined (which get zero/one non-retry actions, so
+# there'd be nothing to route through a real retry attempt), and never
+# insufficient_funds (whose single-shot action set makes the LLM-ambiguous
+# path more likely to matter, which real candidates deliberately avoid).
+REAL_CANDIDATE_ROOT_CAUSES = ["gateway_timeout", "network_drop", "auth_failure"]
+
+
+def _make_real_candidate_rows(rng: random.Random, now: datetime, count: int) -> list[dict]:
+    """A small, fixed-count subset whose first bounded action is attempted
+    against a real Razorpay test-mode order (see app/services/execution/)
+    instead of the simulated hash-roll. payment_method is forced to
+    "netbanking" -- Razorpay's test-mode mock bank page exposes explicit
+    Success/Failure buttons for it, the simplest, most deterministic flow to
+    drive with a headless browser (no OTP entry to script). error_reason is
+    left unmasked and drawn only from a soft-decline cause so these rows
+    always classify via the deterministic rule engine, not the LLM fallback --
+    keeps two fragile new surfaces from stacking on the same transactions.
+    Identifiers are fresh and never reused from the fraud clusters, so these
+    rows structurally can't trip the safety monitor's cross-transaction checks.
+    """
+    rows = []
+    for _ in range(count):
+        root_cause = rng.choice(REAL_CANDIDATE_ROOT_CAUSES)
+        meta = ERROR_META[root_cause]
+        failed_at = now - timedelta(days=rng.randint(0, 14), hours=rng.randint(0, 23))
+        rows.append(
+            {
+                "transaction_id": f"txn_{uuid.UUID(int=rng.getrandbits(128)).hex[:16]}",
+                "customer_id": f"cust_{uuid.UUID(int=rng.getrandbits(128)).hex[:10]}",
+                "amount": rng.randint(10_000, 50_000),  # paise: ₹100-₹500, kept small for demo legibility
+                "currency": "INR",
+                "payment_method": "netbanking",
+                "payment_instrument_id": _make_instrument_id(rng, "netbanking"),
+                "issuer_bank": rng.choice(ISSUER_BANKS),
+                "ip_address": _make_ip_address(rng),
+                "error_code": meta["code"],
+                "error_source": meta["source"],
+                "error_step": meta["step"],
+                "error_reason": rng.choice(meta["reasons"]),
+                "failed_at": failed_at,
+                "network_type": rng.choice(NETWORK_TYPES),
+                "latency_ms": rng.randint(50, 400),
+                "risk_score": round(rng.uniform(0.05, 0.5), 2),
+                "true_root_cause": root_cause,
+                "status": "open",
+                "final_action": None,
+                "total_attempts": 0,
+                "recovered_amount": 0,
+                "resolved_at": None,
+                "is_real": True,
+            }
+        )
+    return rows
+
+
 def generate_failed_payments(
     count: int = 100,
     seed: int = 42,
@@ -324,12 +380,19 @@ def generate_failed_payments(
     faker.seed_instance(seed)
 
     now = reference_time or DEFAULT_REFERENCE_TIME
-    # Fixed order: all three special-row groups draw from the same rng
-    # stream, so this order is now baked into seed=42 reproducibility.
+    # Fixed order: all special-row groups draw from the same rng stream, so
+    # this order is now baked into seed=42 reproducibility. The real-candidate
+    # group is appended last and only when explicitly enabled, so with
+    # razorpay_execution_enabled=False (the default) this function's output --
+    # including seed=42 reproducibility -- is byte-identical to before this
+    # group existed.
     cluster_rows = _make_card_testing_cluster(rng, faker, now)
     ip_cluster_rows = _make_ip_velocity_cluster(rng, now)
     ceiling_row = _make_network_ceiling_demo_row(rng, now)
     special_rows = cluster_rows + ip_cluster_rows + [ceiling_row]
+
+    if settings.razorpay_execution_enabled and settings.razorpay_real_txn_count > 0:
+        special_rows += _make_real_candidate_rows(rng, now, settings.razorpay_real_txn_count)
 
     remaining = max(count - len(special_rows), 0)
     categories = list(ROOT_CAUSE_WEIGHTS.keys())

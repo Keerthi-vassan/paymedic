@@ -48,5 +48,18 @@ class Settings(BaseSettings):
     sarvam_api_key: str = ""
     sarvam_model: str = "sarvam-105b"
 
+    # Optional real Razorpay test-mode integration: blends a small, fixed
+    # number of real API-driven transactions into each generated batch
+    # instead of every outcome being a simulated hash-roll. Off by default --
+    # dataset generation, batch composition, and seed=42 reproducibility are
+    # byte-identical to the fully-simulated system when disabled, so a clean
+    # clone with no Razorpay keys behaves exactly as it always has.
+    razorpay_execution_enabled: bool = False
+    razorpay_key_id: str = ""
+    razorpay_key_secret: str = ""
+    razorpay_real_txn_count: int = 4
+    razorpay_real_execution_timeout_seconds: int = 45
+    razorpay_base_url: str = "https://api.razorpay.com/v1"
+
 
 settings = Settings()

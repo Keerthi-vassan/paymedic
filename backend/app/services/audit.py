@@ -17,6 +17,10 @@ def log_event(
     outcome: str | None = None,
     attempt_number: int | None = None,
     scheduled_at: datetime | None = None,
+    execution_source: str | None = None,
+    gateway_order_id: str | None = None,
+    gateway_payment_id: str | None = None,
+    gateway_status: str | None = None,
 ) -> AuditLog:
     entry = AuditLog(
         transaction_id=transaction_id,
@@ -29,6 +33,10 @@ def log_event(
         outcome=outcome,
         attempt_number=attempt_number,
         scheduled_at=scheduled_at,
+        execution_source=execution_source,
+        gateway_order_id=gateway_order_id,
+        gateway_payment_id=gateway_payment_id,
+        gateway_status=gateway_status,
     )
     db.add(entry)
     db.commit()

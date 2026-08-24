@@ -3,6 +3,9 @@ backend/__pycache__/
 backend/**/__pycache__/
 backend/.pytest_cache/
 backend/data/*.db
+# Only ever created locally when EXECUTION_DEBUG_SCREENSHOTS=1 is set while
+# developing app/services/execution/browser_driver.py -- never on by default.
+backend/data/debug_screenshots/
 *.pyc
 
 # Node / Next.js
