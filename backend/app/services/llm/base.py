@@ -91,3 +91,13 @@ class LLMProvider(Protocol):
     name: str
 
     def classify_ambiguous(self, payment: FailedPayment) -> LLMClassification: ...
+
+    def draft_text(self, system_prompt: str, user_content: str, max_tokens: int) -> str:
+        """Free-text generation, used only for customer-facing copy that a
+        caller-side guard then validates (see app/services/notifier.py).
+        Deliberately a generic primitive rather than a payments-specific
+        method: the provider adapters stay dumb transports, and every rule
+        about what the text is allowed to say lives in one auditable place
+        outside them. Nothing this returns ever reaches the decision engine.
+        """
+        ...

@@ -31,7 +31,15 @@ class GeminiProvider:
     name = "gemini"
 
     def __init__(self):
-        self._client = genai.Client(api_key=settings.gemini_api_key)
+        self._client = genai.Client(
+            api_key=settings.gemini_api_key,
+            # Milliseconds here, unlike every other SDK's seconds -- and
+            # attempts, not retries, so +1 to mean the same thing.
+            http_options=types.HttpOptions(
+                timeout=int(settings.llm_timeout_seconds * 1000),
+                retry_options=types.HttpRetryOptions(attempts=settings.llm_max_retries + 1),
+            ),
+        )
 
     def classify_ambiguous(self, payment: FailedPayment) -> LLMClassification:
         response = self._client.models.generate_content(
@@ -46,3 +54,14 @@ class GeminiProvider:
 
         raw = json.loads(response.text)
         return validate_classification(raw)
+
+    def draft_text(self, system_prompt: str, user_content: str, max_tokens: int) -> str:
+        response = self._client.models.generate_content(
+            model=settings.gemini_model,
+            contents=user_content,
+            config=types.GenerateContentConfig(
+                system_instruction=system_prompt,
+                max_output_tokens=max_tokens,
+            ),
+        )
+        return response.text or ""

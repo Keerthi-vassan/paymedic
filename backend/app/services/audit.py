@@ -21,6 +21,7 @@ def log_event(
     gateway_order_id: str | None = None,
     gateway_payment_id: str | None = None,
     gateway_status: str | None = None,
+    notification_body: str | None = None,
 ) -> AuditLog:
     entry = AuditLog(
         transaction_id=transaction_id,
@@ -37,6 +38,7 @@ def log_event(
         gateway_order_id=gateway_order_id,
         gateway_payment_id=gateway_payment_id,
         gateway_status=gateway_status,
+        notification_body=notification_body,
     )
     db.add(entry)
     db.commit()

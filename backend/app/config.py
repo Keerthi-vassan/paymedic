@@ -31,10 +31,47 @@ class Settings(BaseSettings):
     # made explicit and enforced independently of any per-cause policy.
     network_retry_ceiling: int = 15
 
+    # Retry *timing*, not retry count (see app/services/retry_scheduler.py).
+    # Authorization success rates swing ~15% with time of day, so a scheduled
+    # attempt landing in the small hours is moved to the next morning, and an
+    # insufficient_funds retry landing just before a salary-credit date is
+    # nudged onto it rather than firing into a trough. Bounded by
+    # payday_lookahead_days so this can never push an attempt past the
+    # industry 10-14 day retry envelope.
+    quiet_hours_start: int = 1
+    quiet_hours_end: int = 6
+    quiet_hours_resume_hour: int = 9
+    payday_lookahead_days: int = 3
+    payday_retry_hour: int = 10
+
+    # Customer-facing nudge drafting (see app/services/notifier.py). The LLM
+    # may personalize within a fixed template's bounds; anything longer than
+    # this, or containing content the guard rejects, falls back to the
+    # template verbatim.
+    notification_max_chars: int = 240
+    notification_llm_enabled: bool = True
+
+    # Shared secret for verifying real Razorpay webhook deliveries
+    # (app/routers/webhooks.py). Empty means the endpoint refuses every
+    # request rather than accepting unverified ones.
+    razorpay_webhook_secret: str = ""
+
     # Which LLM backs ambiguous-case classification. Swapping providers is a
     # one-line env var change -- each provider is a drop-in adapter behind the
     # same interface, see app/services/llm/.
     llm_provider: str = "anthropic"  # anthropic | openai | gemini | sarvam
+
+    # Hard bound on how long a single classification may take, and how many
+    # times its SDK may retry internally. Without these, a rate-limited or
+    # degraded provider turns a ~10s batch into minutes of invisible backoff:
+    # the SDKs honour a 429's "retry after" and keep going, so the pipeline
+    # appears to hang rather than fail. One retry, then fail fast -- the
+    # classifier's fail-closed path already turns an error into a safe
+    # escalation, and an escalation now beats a correct answer in four
+    # minutes. The llm_error count in /metrics/classifier is what makes the
+    # degradation visible instead of silent.
+    llm_timeout_seconds: float = 20.0
+    llm_max_retries: int = 1
 
     anthropic_api_key: str = ""
     anthropic_model: str = "claude-haiku-4-5-20251001"

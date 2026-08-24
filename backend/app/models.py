@@ -5,6 +5,12 @@ from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db import Base
 
+# Ground truth for a transaction that arrived from a real Razorpay webhook
+# rather than the generator. Real events carry no label -- nobody knows the
+# "correct" root cause for a live failure -- so these rows are excluded from
+# every accuracy and false-action figure rather than silently counted wrong.
+UNKNOWN_ROOT_CAUSE = "unknown"
+
 
 class FailedPayment(Base):
     __tablename__ = "failed_payments"
@@ -42,7 +48,13 @@ class FailedPayment(Base):
 
     # Hidden ground truth used only for offline evaluation of the classifier,
     # never read by the classifier/decision engine/executor themselves.
+    # UNKNOWN_ROOT_CAUSE for webhook-ingested rows, which have no label.
     true_root_cause: Mapped[str] = mapped_column(String)
+
+    # synthetic | razorpay_webhook -- where this row came from. A real webhook
+    # delivery goes through the identical pipeline, but is graded differently
+    # (see UNKNOWN_ROOT_CAUSE) and is worth distinguishing in the UI.
+    ingest_source: Mapped[str] = mapped_column(String, default="synthetic")
 
     status: Mapped[str] = mapped_column(String, default="open")
     final_action: Mapped[str | None] = mapped_column(String, nullable=True)
@@ -70,7 +82,7 @@ class AuditLog(Base):
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     transaction_id: Mapped[str] = mapped_column(ForeignKey("failed_payments.transaction_id"))
 
-    # classification | decision | action_execution | safety_override
+    # classification | decision | action_execution | notification | safety_override
     event_type: Mapped[str] = mapped_column(String)
     # rule_engine | llm | decision_engine | executor | safety_monitor
     source: Mapped[str] = mapped_column(String)
@@ -99,3 +111,10 @@ class AuditLog(Base):
     gateway_order_id: Mapped[str | None] = mapped_column(String, nullable=True)
     gateway_payment_id: Mapped[str | None] = mapped_column(String, nullable=True)
     gateway_status: Mapped[str | None] = mapped_column(String, nullable=True)
+
+    # Populated only on "notification" events: the exact customer-facing copy
+    # a send_reminder action put out. Stored as its own column rather than
+    # folded into `reasoning`, which stays what it is everywhere else -- the
+    # system's explanation of its own behavior. The message is evidence, not
+    # reasoning, and an audit trail should be able to show both.
+    notification_body: Mapped[str | None] = mapped_column(String, nullable=True)
