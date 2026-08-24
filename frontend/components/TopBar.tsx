@@ -22,16 +22,22 @@ export function TopBar({
   health,
   generating,
   running,
+  runningReal,
+  showRealButton,
   lastRunSummary,
   onGenerate,
   onRunPipeline,
+  onRunRealPipeline,
 }: {
   health: HealthStatus;
   generating: boolean;
   running: boolean;
+  runningReal: boolean;
+  showRealButton: boolean;
   lastRunSummary: string | null;
   onGenerate: () => void;
   onRunPipeline: () => void;
+  onRunRealPipeline: () => void;
 }) {
   return (
     <header className="flex items-center justify-between bg-chrome px-6 py-3.5 shadow-md">
@@ -70,6 +76,19 @@ export function TopBar({
         >
           {generating ? "Generating..." : "Generate Batch"}
         </motion.button>
+        {showRealButton && (
+          <motion.button
+            onClick={onRunRealPipeline}
+            disabled={runningReal}
+            title="Runs the small real-candidate subset against a genuine Razorpay test-mode transaction. Kept separate from Run Pipeline since it involves real network + browser-automation time."
+            whileHover={{ backgroundColor: "rgba(255,255,255,0.1)" }}
+            whileTap={{ scale: 0.95 }}
+            transition={transitions.hover}
+            className="rounded-md border border-accent/60 px-3 py-1.5 text-sm font-medium text-accent disabled:opacity-50"
+          >
+            {runningReal ? "Running..." : "Run Real Transactions"}
+          </motion.button>
+        )}
         <motion.button
           onClick={onRunPipeline}
           disabled={running}

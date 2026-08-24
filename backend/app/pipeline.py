@@ -160,8 +160,26 @@ def run_transaction(
             db.commit()
 
 
+def _summarize(payments: list[FailedPayment]) -> PipelineRunSummary:
+    recovered = [p for p in payments if p.status == "recovered"]
+    escalated = [p for p in payments if p.status == "escalated"]
+    blocked = [p for p in payments if p.status == "blocked"]
+
+    return PipelineRunSummary(
+        processed=len(payments),
+        recovered=len(recovered),
+        escalated=len(escalated),
+        blocked=len(blocked),
+        total_recovered_amount=sum(p.recovered_amount for p in recovered),
+    )
+
+
 def run_batch(db: Session, transaction_ids: list[str] | None = None) -> PipelineRunSummary:
-    query = db.query(FailedPayment).filter(FailedPayment.status == "open")
+    # is_real rows are excluded here and handled only by run_real_batch below
+    # -- keeps this batch's documented ~10-14s/100-txn timing true regardless
+    # of whether real execution is enabled, instead of an unpredictable ~15-45s
+    # pause per real candidate landing at a random point in the loop.
+    query = db.query(FailedPayment).filter(FailedPayment.status == "open", FailedPayment.is_real == False)  # noqa: E712
     if transaction_ids:
         query = query.filter(FailedPayment.transaction_id.in_(transaction_ids))
 
@@ -179,14 +197,24 @@ def run_batch(db: Session, transaction_ids: list[str] | None = None) -> Pipeline
     for payment in payments:
         run_transaction(db, payment, classifications[payment])
 
-    recovered = [p for p in payments if p.status == "recovered"]
-    escalated = [p for p in payments if p.status == "escalated"]
-    blocked = [p for p in payments if p.status == "blocked"]
+    return _summarize(payments)
 
-    return PipelineRunSummary(
-        processed=len(payments),
-        recovered=len(recovered),
-        escalated=len(escalated),
-        blocked=len(blocked),
-        total_recovered_amount=sum(p.recovered_amount for p in recovered),
-    )
+
+def run_real_batch(db: Session, transaction_ids: list[str] | None = None) -> PipelineRunSummary:
+    """Processes only the small, fixed-count is_real subset, as its own
+    explicit step -- deliberately sequential (not the ThreadPoolExecutor
+    run_batch uses for classification) since there are only a handful of
+    rows and each involves real network + browser-automation I/O, where
+    concurrency would only add flakiness for negligible time savings.
+    """
+    query = db.query(FailedPayment).filter(FailedPayment.status == "open", FailedPayment.is_real == True)  # noqa: E712
+    if transaction_ids:
+        query = query.filter(FailedPayment.transaction_id.in_(transaction_ids))
+
+    payments = query.all()
+
+    for payment in payments:
+        classification = classifier.classify(payment)
+        run_transaction(db, payment, classification)
+
+    return _summarize(payments)

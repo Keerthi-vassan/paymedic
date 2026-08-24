@@ -2,7 +2,7 @@ from datetime import datetime
 
 from app.models import AuditLog, FailedPayment
 from app.services.classifier import ClassificationResult
-from app.pipeline import run_transaction
+from app.pipeline import run_batch, run_real_batch, run_transaction
 
 
 def make_open_payment(db, **overrides):
@@ -71,3 +71,32 @@ def test_scheduled_at_is_null_when_escalating(db):
     decision_event = get_first_decision_event(db, payment.transaction_id)
     assert decision_event.scheduled_at is None
     assert payment.status == "escalated"
+
+
+def test_run_batch_excludes_real_candidates(db):
+    """run_batch (the fast, documented ~10-14s/100-txn path) must never touch
+    is_real rows -- they're handled only by run_real_batch, kept out so the
+    main batch's timing stays predictable regardless of whether real
+    execution is enabled.
+    """
+    ordinary = make_open_payment(db, transaction_id="txn_ordinary")
+    real_candidate = make_open_payment(db, transaction_id="txn_real", is_real=True)
+
+    summary = run_batch(db)
+
+    assert summary.processed == 1
+    assert ordinary.status != "open"
+    assert real_candidate.status == "open"
+    assert real_candidate.total_attempts == 0
+
+
+def test_run_real_batch_only_processes_real_candidates(db):
+    ordinary = make_open_payment(db, transaction_id="txn_ordinary")
+    real_candidate = make_open_payment(db, transaction_id="txn_real", is_real=True)
+
+    summary = run_real_batch(db)
+
+    assert summary.processed == 1
+    assert real_candidate.status != "open"
+    assert ordinary.status == "open"
+    assert ordinary.total_attempts == 0

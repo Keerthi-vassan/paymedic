@@ -6,6 +6,7 @@ import { AnimatePresence, motion } from "framer-motion";
 import { listPayments } from "@/lib/api";
 import { formatCurrency } from "@/lib/format";
 import { rowVariants, transitions } from "@/lib/motion";
+import { RealBadge } from "@/components/RealBadge";
 import { StatusBadge } from "@/components/StatusBadge";
 import type { FailedPayment } from "@/types";
 
@@ -159,7 +160,10 @@ export function FailedPaymentsFeed({
                         <td className="py-1.5 pr-3 text-foreground">{p.payment_method}</td>
                         <td className="py-1.5 pr-3 text-foreground">{p.true_root_cause}</td>
                         <td className="py-1.5 pr-3">
-                          <StatusBadge status={p.status} />
+                          <div className="flex items-center gap-2">
+                            <StatusBadge status={p.status} />
+                            {p.is_real && p.real_execution_verified && <RealBadge />}
+                          </div>
                         </td>
                         <td className="py-1.5 text-xs text-muted-foreground">
                           {new Date(p.failed_at).toLocaleString()}

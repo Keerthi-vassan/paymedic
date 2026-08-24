@@ -23,6 +23,16 @@ export interface FailedPayment {
   /** Paise. */
   recovered_amount: number;
   resolved_at: string | null;
+  /** Marks this row as one of the small, fixed-count subset attempted
+   * against a real Razorpay test-mode transaction. See real_execution_verified
+   * for whether that attempt actually completed against the real gateway. */
+  is_real: boolean;
+  /** True only once a real gateway response was actually obtained -- a
+   * real candidate whose attempt fell back to simulated stays is_real=true,
+   * real_execution_verified=false, and must be treated as simulated in the UI. */
+  real_execution_verified: boolean;
+  gateway_order_id: string | null;
+  gateway_payment_id: string | null;
 }
 
 export interface PaymentsListResponse {
@@ -59,6 +69,11 @@ export interface AuditLogEntry {
   attempt_number: number | null;
   scheduled_at: string | null;
   created_at: string;
+  /** "real_razorpay" | "simulated" | null -- only populated on action_execution events. */
+  execution_source: string | null;
+  gateway_order_id: string | null;
+  gateway_payment_id: string | null;
+  gateway_status: string | null;
 }
 
 export interface AuditListResponse {
@@ -81,6 +96,10 @@ export interface MetricsSummary {
   fraud_block_rate: number;
   avg_time_to_recovery_minutes: number | null;
   median_time_to_recovery_minutes: number | null;
+  /** How many of this batch's small real-candidate subset actually completed
+   * against a genuine Razorpay test-mode transaction (verified <= candidate). */
+  real_candidate_count: number;
+  real_execution_verified_count: number;
 }
 
 export interface RootCauseBreakdownRow {
@@ -109,4 +128,5 @@ export interface ConfigRules {
   velocity_threshold_count: number;
   ip_velocity_threshold_count: number;
   llm_provider: string;
+  razorpay_execution_enabled: boolean;
 }

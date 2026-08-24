@@ -97,6 +97,8 @@ class MetricsSummaryOut(BaseModel):
     fraud_block_rate: float
     avg_time_to_recovery_minutes: float | None
     median_time_to_recovery_minutes: float | None
+    real_candidate_count: int
+    real_execution_verified_count: int
 
 
 class RootCauseBreakdownRowOut(BaseModel):
@@ -124,3 +126,4 @@ class ConfigRulesOut(BaseModel):
     velocity_threshold_count: int
     ip_velocity_threshold_count: int
     llm_provider: str
+    razorpay_execution_enabled: bool

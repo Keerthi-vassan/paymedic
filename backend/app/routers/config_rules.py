@@ -19,4 +19,5 @@ def get_rules():
         velocity_threshold_count=settings.velocity_threshold_count,
         ip_velocity_threshold_count=settings.ip_velocity_threshold_count,
         llm_provider=settings.llm_provider,
+        razorpay_execution_enabled=settings.razorpay_execution_enabled,
     )

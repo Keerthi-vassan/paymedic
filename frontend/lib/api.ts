@@ -50,6 +50,10 @@ export function runPipeline() {
   return apiFetch<PipelineRunResponse>("/pipeline/run", { method: "POST" });
 }
 
+export function runRealPipeline() {
+  return apiFetch<PipelineRunResponse>("/pipeline/run-real", { method: "POST" });
+}
+
 export function getTransactionAudit(transactionId: string) {
   return apiFetch<AuditListResponse>(`/audit/${transactionId}`);
 }

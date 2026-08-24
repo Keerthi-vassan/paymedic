@@ -23,6 +23,8 @@ class MetricsSummary:
     fraud_block_rate: float
     avg_time_to_recovery_minutes: float | None
     median_time_to_recovery_minutes: float | None
+    real_candidate_count: int
+    real_execution_verified_count: int
 
 
 @dataclass
@@ -63,6 +65,9 @@ def compute_summary(db: Session) -> MetricsSummary:
         if p.resolved_at is not None
     ]
 
+    real_candidates = [p for p in payments if p.is_real]
+    real_verified = [p for p in real_candidates if p.real_execution_verified]
+
     return MetricsSummary(
         total_transactions=total,
         total_at_risk_amount=sum(p.amount for p in payments),
@@ -78,6 +83,8 @@ def compute_summary(db: Session) -> MetricsSummary:
         median_time_to_recovery_minutes=(
             round(median(recovery_times_minutes), 2) if recovery_times_minutes else None
         ),
+        real_candidate_count=len(real_candidates),
+        real_execution_verified_count=len(real_verified),
     )
 
 

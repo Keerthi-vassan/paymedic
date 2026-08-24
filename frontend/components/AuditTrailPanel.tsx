@@ -5,6 +5,7 @@ import { AnimatePresence, motion } from "framer-motion";
 
 import { getTransactionAudit } from "@/lib/api";
 import { rowVariants, staggerContainer, transitions } from "@/lib/motion";
+import { RealBadge } from "@/components/RealBadge";
 import type { AuditLogEntry } from "@/types";
 
 const EVENT_LABELS: Record<string, string> = {
@@ -16,13 +17,18 @@ const EVENT_LABELS: Record<string, string> = {
 
 function EventCard({ entry }: { entry: AuditLogEntry }) {
   const isOverride = entry.event_type === "safety_override";
+  const isReal = entry.execution_source === "real_razorpay";
 
   return (
     <motion.div
       variants={rowVariants}
       transition={transitions.row}
       className={`relative rounded-md border px-3 py-2.5 shadow-sm ${
-        isOverride ? "border-status-blocked/40 bg-status-blocked/5" : "border-border bg-surface"
+        isOverride
+          ? "border-status-blocked/40 bg-status-blocked/5"
+          : isReal
+            ? "border-accent/30 bg-accent/5"
+            : "border-border bg-surface"
       }`}
     >
       {/* Independent of the card's own (staggered) entrance -- runs once,
@@ -39,13 +45,16 @@ function EventCard({ entry }: { entry: AuditLogEntry }) {
       )}
 
       <div className="flex items-center justify-between gap-2">
-        <span
-          className={`text-xs font-semibold uppercase tracking-wide ${
-            isOverride ? "text-status-blocked-text" : "text-muted-foreground"
-          }`}
-        >
-          {EVENT_LABELS[entry.event_type] ?? entry.event_type}
-        </span>
+        <div className="flex items-center gap-2">
+          <span
+            className={`text-xs font-semibold uppercase tracking-wide ${
+              isOverride ? "text-status-blocked-text" : "text-muted-foreground"
+            }`}
+          >
+            {EVENT_LABELS[entry.event_type] ?? entry.event_type}
+          </span>
+          {isReal && <RealBadge />}
+        </div>
         <span className="text-xs text-muted-foreground">
           {new Date(entry.created_at).toLocaleTimeString()}
         </span>
@@ -67,6 +76,9 @@ function EventCard({ entry }: { entry: AuditLogEntry }) {
           </span>
         )}
         <span>source: {entry.source}</span>
+        {entry.gateway_payment_id && <span className="font-mono">razorpay payment: {entry.gateway_payment_id}</span>}
+        {entry.gateway_order_id && <span className="font-mono">razorpay order: {entry.gateway_order_id}</span>}
+        {entry.gateway_status && <span>gateway status: {entry.gateway_status}</span>}
       </div>
     </motion.div>
   );

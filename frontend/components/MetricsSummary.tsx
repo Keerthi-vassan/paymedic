@@ -90,6 +90,18 @@ export function MetricsSummary({ refreshKey }: { refreshKey: number }) {
           value:
             metrics.median_time_to_recovery_minutes === null ? "—" : formatMinutes(medianMinutes),
         },
+        // Only shown once a batch was generated with real Razorpay execution
+        // enabled -- absent (not "0/0") otherwise, since a batch with no real
+        // candidates at all isn't the same claim as "0 of N verified."
+        ...(metrics.real_candidate_count > 0
+          ? [
+              {
+                label: "Razorpay Verified",
+                value: `${metrics.real_execution_verified_count}/${metrics.real_candidate_count}`,
+                emphasis: true,
+              },
+            ]
+          : []),
       ]
     : [];
 

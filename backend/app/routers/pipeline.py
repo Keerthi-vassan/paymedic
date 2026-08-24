@@ -22,6 +22,21 @@ def run(request: PipelineRunRequest = PipelineRunRequest(), db: Session = Depend
     )
 
 
+@router.post("/run-real", response_model=PipelineRunResponse)
+def run_real(request: PipelineRunRequest = PipelineRunRequest(), db: Session = Depends(get_db)):
+    """Processes only the small is_real subset, as its own explicit step --
+    see pipeline.run_real_batch for why this is kept out of the main /run.
+    """
+    summary = pipeline.run_real_batch(db, transaction_ids=request.transaction_ids)
+    return PipelineRunResponse(
+        processed=summary.processed,
+        recovered=summary.recovered,
+        escalated=summary.escalated,
+        blocked=summary.blocked,
+        total_recovered_amount=summary.total_recovered_amount,
+    )
+
+
 @router.post("/run/{transaction_id}", response_model=PipelineRunResponse)
 def run_single(transaction_id: str, db: Session = Depends(get_db)):
     payment = db.get(FailedPayment, transaction_id)

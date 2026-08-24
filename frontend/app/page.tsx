@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { MotionConfig } from "framer-motion";
 
-import { generateBatch, getHealth, runPipeline } from "@/lib/api";
+import { generateBatch, getConfigRules, getHealth, runPipeline, runRealPipeline } from "@/lib/api";
 import { formatCurrency } from "@/lib/format";
 import { ActionsTakenTable } from "@/components/ActionsTakenTable";
 import { AuditTrailPanel } from "@/components/AuditTrailPanel";
@@ -22,6 +22,8 @@ export default function Home() {
   const [refreshKey, setRefreshKey] = useState(0);
   const [generating, setGenerating] = useState(false);
   const [running, setRunning] = useState(false);
+  const [runningReal, setRunningReal] = useState(false);
+  const [showRealButton, setShowRealButton] = useState(false);
   const [selectedTransaction, setSelectedTransaction] = useState<string | null>(null);
   const [lastRunSummary, setLastRunSummary] = useState<string | null>(null);
 
@@ -29,6 +31,12 @@ export default function Home() {
     getHealth()
       .then(() => setHealth("ok"))
       .catch(() => setHealth("error"));
+  }, []);
+
+  useEffect(() => {
+    getConfigRules()
+      .then((rules) => setShowRealButton(rules.razorpay_execution_enabled))
+      .catch(() => setShowRealButton(false));
   }, []);
 
   useEffect(() => {
@@ -61,6 +69,21 @@ export default function Home() {
     }
   };
 
+  const handleRunRealPipeline = async () => {
+    setRunningReal(true);
+    try {
+      const res = await runRealPipeline();
+      setRefreshKey((k) => k + 1);
+      setLastRunSummary(
+        res.processed === 0
+          ? "No real candidates left to process"
+          : `✓ Razorpay verified: ${res.recovered} recovered · ${formatCurrency(res.total_recovered_amount)}`
+      );
+    } finally {
+      setRunningReal(false);
+    }
+  };
+
   return (
     <MotionConfig reducedMotion="user">
       <div className="flex min-h-screen flex-col bg-background">
@@ -68,9 +91,12 @@ export default function Home() {
           health={health}
           generating={generating}
           running={running}
+          runningReal={runningReal}
+          showRealButton={showRealButton}
           lastRunSummary={lastRunSummary}
           onGenerate={handleGenerate}
           onRunPipeline={handleRunPipeline}
+          onRunRealPipeline={handleRunRealPipeline}
         />
 
         <main className="mx-auto flex w-full max-w-7xl flex-1 flex-col gap-4 px-6 py-6">

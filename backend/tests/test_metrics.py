@@ -72,6 +72,19 @@ def test_summary_handles_empty_batch(db):
     assert summary.recovery_rate == 0.0
     assert summary.avg_time_to_recovery_minutes is None
     assert summary.median_time_to_recovery_minutes is None
+    assert summary.real_candidate_count == 0
+    assert summary.real_execution_verified_count == 0
+
+
+def test_summary_counts_real_execution_candidates(db):
+    make_payment(db, transaction_id="1", is_real=True, real_execution_verified=True)
+    make_payment(db, transaction_id="2", is_real=True, real_execution_verified=False)
+    make_payment(db, transaction_id="3", is_real=False)
+
+    summary = metrics.compute_summary(db)
+
+    assert summary.real_candidate_count == 2
+    assert summary.real_execution_verified_count == 1
 
 
 def test_root_cause_breakdown_groups_correctly(db):

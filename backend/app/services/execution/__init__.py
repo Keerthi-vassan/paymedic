@@ -73,18 +73,18 @@ def attempt_real_execution(payment: FailedPayment, root_cause: str, attempt_numb
     # trusting the checkout widget's client-side JS callback, which proved
     # unreliable under headless automation (confirmed live: a payment was
     # genuinely captured server-side while the callback never fired).
-    payment = _poll_for_terminal_payment(order_id, settings.razorpay_real_execution_timeout_seconds)
-    if payment is None:
+    gateway_payment = _poll_for_terminal_payment(order_id, settings.razorpay_real_execution_timeout_seconds)
+    if gateway_payment is None:
         return fallback
 
-    outcome = "success" if payment["status"] == "captured" else "fail"
+    outcome = "success" if gateway_payment["status"] == "captured" else "fail"
     return RealExecutionResult(
         outcome=outcome,
         verified=True,
         execution_source="real_razorpay",
         gateway_order_id=order_id,
-        gateway_payment_id=payment.get("id"),
-        gateway_status=payment.get("status"),
+        gateway_payment_id=gateway_payment.get("id"),
+        gateway_status=gateway_payment.get("status"),
     )
 
 

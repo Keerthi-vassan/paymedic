@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 
 import { rowVariants, transitions } from "@/lib/motion";
+import { RealBadge } from "@/components/RealBadge";
 import type { AuditLogEntry } from "@/types";
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000";
@@ -119,12 +120,17 @@ export function ActionsTakenTable({
                         <td className="py-1.5 pr-3 tabular-nums text-muted-foreground">
                           {item.attempt_number ?? "—"}
                         </td>
-                        <td
-                          className={`py-1.5 font-medium ${
-                            item.outcome === "success" ? "text-status-recovered-text" : "text-muted-foreground"
-                          }`}
-                        >
-                          {item.outcome ?? "—"}
+                        <td className="py-1.5">
+                          <div className="flex items-center gap-2">
+                            <span
+                              className={`font-medium ${
+                                item.outcome === "success" ? "text-status-recovered-text" : "text-muted-foreground"
+                              }`}
+                            >
+                              {item.outcome ?? "—"}
+                            </span>
+                            {item.execution_source === "real_razorpay" && <RealBadge />}
+                          </div>
                         </td>
                       </motion.tr>
                     ))}
