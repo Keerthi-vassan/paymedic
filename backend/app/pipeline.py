@@ -13,7 +13,15 @@ from sqlalchemy.orm import Session
 
 from app.config import settings
 from app.models import FailedPayment
-from app.services import audit, classifier, decision_engine, executor, safety_monitor
+from app.services import (
+    audit,
+    classifier,
+    decision_engine,
+    executor,
+    notifier,
+    retry_scheduler,
+    safety_monitor,
+)
 from app.services import execution as real_execution
 
 CLASSIFICATION_WORKERS = 8
@@ -58,26 +66,41 @@ def run_transaction(
             attempts_so_far=payment.total_attempts,
         )
         attempt_number = payment.total_attempts + 1
-        # Projected delay/schedule for this attempt, computed once and reused
-        # below for both the audit trail and elapsed_minutes, so the two
-        # can't drift. None whenever escalating -- there's no action to
-        # schedule, mirroring attempt_number's own None-on-escalate below.
-        projected_delay = (
-            None
-            if decision.escalate
-            else executor.resolution_delay_minutes(decision.action, attempt_number)
-        )
-        scheduled_at = (
-            None
-            if decision.escalate
-            else payment.failed_at + timedelta(minutes=elapsed_minutes + projected_delay)
-        )
+        # Projected schedule for this attempt, computed once and reused below
+        # for both the audit trail and elapsed_minutes, so the two can't
+        # drift. None whenever escalating -- there's no action to schedule,
+        # mirroring attempt_number's own None-on-escalate below.
+        #
+        # Two separate concerns: resolution_delay_minutes decides HOW LONG to
+        # wait (day-scale spacing between attempts), retry_scheduler decides
+        # WHEN that lands (quiet hours, salary-credit alignment). Whatever
+        # the scheduler adjusts is appended to the decision's own reasoning,
+        # so the audit trail explains the timing as explicitly as it already
+        # explains the action.
+        if decision.escalate:
+            scheduled_at = None
+            schedule_reasoning = None
+        else:
+            base_delay = executor.resolution_delay_minutes(decision.action, attempt_number)
+            adjustment = retry_scheduler.schedule(
+                target=payment.failed_at + timedelta(minutes=elapsed_minutes + base_delay),
+                action=decision.action,
+                root_cause=classification.root_cause,
+                base_delay_minutes=base_delay,
+            )
+            scheduled_at = adjustment.scheduled_at
+            schedule_reasoning = adjustment.reasoning
+
+        decision_reasoning = decision.reasoning
+        if schedule_reasoning:
+            decision_reasoning += f" -- {schedule_reasoning}"
+
         audit.log_event(
             db,
             transaction_id=payment.transaction_id,
             event_type="decision",
             source="decision_engine",
-            reasoning=decision.reasoning,
+            reasoning=decision_reasoning,
             root_cause=classification.root_cause,
             action_taken=decision.action,
             attempt_number=None if decision.escalate else attempt_number,
@@ -117,7 +140,10 @@ def run_transaction(
             gateway_status = None
 
         payment.total_attempts = attempt_number
-        elapsed_minutes += projected_delay
+        # Derived from the scheduled time rather than accumulating raw delays,
+        # so any adjustment retry_scheduler made is carried into resolved_at
+        # instead of the two silently disagreeing about when this landed.
+        elapsed_minutes = (scheduled_at - payment.failed_at).total_seconds() / 60
 
         reasoning = f"executed {decision.action} (attempt {attempt_number})"
         if use_real:
@@ -141,6 +167,26 @@ def run_transaction(
             gateway_payment_id=payment.gateway_payment_id if use_real else None,
             gateway_status=gateway_status,
         )
+
+        # Dunning is the other half of recovery: a reminder that no operator
+        # can read the text of isn't auditable. Drafted after execution, so
+        # the message is recorded only for a reminder that actually went out.
+        if decision.action == "send_reminder":
+            notification = notifier.draft(
+                root_cause=classification.root_cause,
+                amount_paise=payment.amount,
+            )
+            audit.log_event(
+                db,
+                transaction_id=payment.transaction_id,
+                event_type="notification",
+                source=notification.source,
+                reasoning=notification.reasoning,
+                root_cause=classification.root_cause,
+                action_taken=decision.action,
+                attempt_number=attempt_number,
+                notification_body=notification.body,
+            )
 
         db.commit()
 

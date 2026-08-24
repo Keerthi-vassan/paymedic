@@ -1,5 +1,5 @@
 from app.config import settings
-from app.services.decision_engine import ROOT_CAUSE_ACTIONS, decide
+from app.services.decision_engine import DECLINE_TYPE, ROOT_CAUSE_ACTIONS, decide
 
 
 def test_fraud_root_cause_always_escalates_regardless_of_confidence_or_attempts():
@@ -86,3 +86,41 @@ def test_below_network_ceiling_but_at_per_cause_cap_still_uses_retry_cap_reasoni
     assert decision.escalate is True
     assert "retry cap reached" in decision.reasoning
     assert "network compliance ceiling" not in decision.reasoning
+
+
+def test_policy_tables_cover_exactly_the_same_root_causes():
+    """Three tables key off the same six causes with nothing structurally
+    keeping them aligned -- adding a root cause to one and forgetting another
+    would silently produce a cause with actions but no success model, or a
+    retry policy with no soft/hard classification.
+    """
+    from app.services.executor import SUCCESS_PROBABILITIES
+
+    assert set(ROOT_CAUSE_ACTIONS) == set(DECLINE_TYPE)
+    assert set(ROOT_CAUSE_ACTIONS) == set(SUCCESS_PROBABILITIES)
+
+
+def test_every_action_sequence_has_a_matching_success_probability():
+    """A cause permitted N attempts needs N probabilities: one short, and the
+    final attempt would silently always fail regardless of policy.
+    """
+    from app.services.executor import SUCCESS_PROBABILITIES
+
+    for root_cause, actions in ROOT_CAUSE_ACTIONS.items():
+        assert len(SUCCESS_PROBABILITIES[root_cause]) == len(actions), root_cause
+
+
+def test_hard_declines_are_never_retried_against_the_same_instrument():
+    """The soft/hard taxonomy has to be enforced by the action table, not just
+    asserted by the label: no hard-decline cause may be assigned a retry.
+    """
+    from app.services.decision_engine import RETRY_ACTIONS
+
+    for root_cause, actions in ROOT_CAUSE_ACTIONS.items():
+        if DECLINE_TYPE[root_cause] == "hard":
+            assert not (set(actions) & RETRY_ACTIONS), root_cause
+
+
+def test_every_cause_stays_under_the_network_compliance_ceiling():
+    for root_cause, actions in ROOT_CAUSE_ACTIONS.items():
+        assert len(actions) < settings.network_retry_ceiling, root_cause

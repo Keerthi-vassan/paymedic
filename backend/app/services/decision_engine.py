@@ -10,8 +10,20 @@ from dataclasses import dataclass
 from app.config import settings
 
 # (action sequence by attempt index, max attempts)
+#
+# insufficient_funds gets a notify-then-retry sequence rather than a single
+# reminder: it is the largest failure bucket in the industry (~34% of failed
+# recurring payments) and the most time-recoverable one, because nothing
+# about the customer's intent failed -- their balance was short at that
+# moment, and balances refill on salary credit. Notifying and then never
+# re-attempting the charge leaves the single most recoverable category
+# dependent entirely on the customer coming back by hand. The two retries
+# are spaced by executor.RESOLUTION_DELAY_MINUTES and timed by
+# retry_scheduler (which aligns them to a salary-credit window), landing the
+# full sequence ~13 days out -- inside the industry 3-5 attempts / 10-14 day
+# envelope, and far under the network compliance ceiling.
 ROOT_CAUSE_ACTIONS: dict[str, list[str]] = {
-    "insufficient_funds": ["send_reminder"],
+    "insufficient_funds": ["send_reminder", "retry_with_backoff", "retry_with_backoff"],
     "gateway_timeout": ["retry_immediate", "retry_with_backoff", "retry_with_backoff"],
     "auth_failure": ["retry_with_backoff", "retry_with_backoff"],
     "network_drop": ["retry_immediate", "retry_with_backoff", "retry_with_backoff"],
@@ -38,6 +50,14 @@ DECLINE_TYPE: dict[str, str] = {
     "card_declined": "hard",
     "possible_fraud": "hard",
 }
+
+# Which bounded actions re-attempt the charge against the same instrument, as
+# opposed to redirecting the customer (suggest_alternate_method) or notifying
+# them (send_reminder). Defined here, next to DECLINE_TYPE, because "a retry
+# against a hard decline" is the exact combination the card networks fine
+# merchants for -- metrics.py measures it as a genuine false action, and
+# retry_scheduler.py uses it to decide what payday alignment applies to.
+RETRY_ACTIONS: frozenset[str] = frozenset({"retry_immediate", "retry_with_backoff"})
 
 
 @dataclass

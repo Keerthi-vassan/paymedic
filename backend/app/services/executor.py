@@ -12,8 +12,16 @@ or which other transactions were processed alongside it.
 
 import hashlib
 
+# insufficient_funds is the one sequence that does NOT diminish monotonically,
+# and deliberately so: its attempt 1 is a reminder, which needs the customer
+# to act, while attempt 2 is an automated retry timed onto a salary-credit
+# window (see retry_scheduler) and needs nothing from them. A retry against a
+# refilled balance genuinely does better than a nudge -- that time-dependence
+# is the whole reason this cause is the industry's most recoverable bucket.
+# By attempt 3 the balance explanation is exhausted and the odds fall away
+# like every other cause.
 SUCCESS_PROBABILITIES: dict[str, list[float]] = {
-    "insufficient_funds": [0.30],
+    "insufficient_funds": [0.30, 0.42, 0.25],
     "gateway_timeout": [0.65, 0.40, 0.20],
     "auth_failure": [0.55, 0.35],
     "network_drop": [0.70, 0.45, 0.25],
@@ -43,7 +51,11 @@ RESOLUTION_DELAY_MINUTES: dict[tuple[str, int], float] = {
     ("retry_with_backoff", 2): 5 * 24 * 60,
     ("retry_with_backoff", 3): 7 * 24 * 60,
     ("suggest_alternate_method", 1): 30,
-    ("send_reminder", 1): 3 * 24 * 60,
+    # Dunning notifications go out promptly -- the reminder is the fast half
+    # of the sequence, the retries after it are the patient half. One day out
+    # keeps the full insufficient_funds sequence (1 + 5 + 7) at ~13 days,
+    # inside the industry 10-14 day envelope.
+    ("send_reminder", 1): 1 * 24 * 60,
 }
 
 
