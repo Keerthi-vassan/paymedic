@@ -173,6 +173,101 @@ Picked back up the same session, once real Razorpay test-mode credentials were a
 
 ---
 
+## Phase 6.7 — Close the research-to-code gaps: measurement, timing, dunning, ingestion
+
+A pass driven by re-reading the project's own research notes against the code and
+finding places where the two disagreed, plus one stated requirement that had never been
+met.
+
+**The unmet requirement.** The build plan called for tracking classification accuracy
+from Days 3-5, and the README's own must-include list named accuracy as a headline
+metric. Nothing measured it. `true_root_cause` sat on every row and was read only for
+fraud-block rate. `GET /metrics/classifier` now grades classification against that
+hidden label: overall accuracy, a per-path split (deterministic rules / LLM fallback /
+failed LLM call), a confusion matrix, and a confidence-calibration table reporting
+accuracy either side of the gate the decision engine actually enforces.
+
+**What that measurement immediately found**, on its first real run — which is the
+argument for having built it:
+- **0 of 8 true fraud cases were classified as fraud** (5 read as `gateway_timeout`,
+  3 as `card_declined`). Not a bug: that is the card-testing clusters behaving exactly
+  as card testing does, and it is the quantitative statement of why the per-transaction
+  classifier cannot be the last line of defence. The metric and the flagship demo case
+  turn out to be the same finding.
+- **14 transactions never reached the classifier at all** — the configured provider's
+  free-tier quota was exhausted, every ambiguous row's LLM call 429'd, and each was
+  forced to zero confidence and escalated. The fail-closed path worked perfectly and
+  was completely invisible before this endpoint existed. The dashboard now shows it as
+  a warning rather than letting it read as ordinary escalations.
+
+**A metric that didn't mean what it said.** `false_action_rate` was `blocked / actioned`
+— which counts only mistakes the system's own safety monitor happened to catch, so any
+wrong action the monitor misses is invisible to it and the number can only ever flatter
+us. It is now graded against ground truth (any action on a true fraud case, or any retry
+against a true hard decline — the combination card networks fine merchants for). The old
+measurement is kept, honestly renamed `safety_override_rate`.
+
+**Two research-to-code disagreements in the retry policy.**
+- `insufficient_funds` had one reminder and *no retry at all*, despite being ~34% of
+  failed recurring payments, the largest bucket and the most time-recoverable — nothing
+  about the customer's intent failed, their balance was short at that moment. Now
+  notify → retry → retry, landing ~13 days out, inside the 3-5 attempts / 10-14 day
+  envelope.
+- Retry *timing* was attempt-indexed only, so an attempt landed at whatever clock time
+  the original failure happened at, including 3am — despite the research noting a ~15%
+  success swing with time of day, and both Stripe Smart Retries and Razorpay's own
+  Intelligent Payment Retry being fundamentally about choosing the moment. New
+  `retry_scheduler` moves day-scale attempts out of a quiet window and pulls
+  `insufficient_funds` retries onto a nearby salary-credit date, bounded so it can only
+  nudge rather than push past the envelope. Adjustments are appended to the decision's
+  audit reasoning.
+
+**Dunning is now real copy, not a label.** `send_reminder` produced nothing an operator
+could read. `notifier` drafts the actual customer-facing message: template-first, with
+the LLM only ever rewriting the template (not the message — `{amount}` stays a
+placeholder and is substituted afterwards, so the model never sees a real amount, one
+rewrite serves the whole batch, and the guard can reject *every digit* rather than
+adjudicating which numbers were legitimate). Guard violations, LLM errors and empty
+responses all fall back to the template verbatim with the reason recorded. The exact
+copy sent is stored on the audit event.
+
+**Event-driven ingestion.** `POST /webhooks/razorpay` accepts the real `payment.failed`
+event, HMAC-SHA256 verified over the raw body in constant time, verified before parsing,
+refusing everything when no secret is configured rather than falling open. Redelivery is
+idempotent on the payment id. This is where mirroring Razorpay's real Payment entity in
+the synthetic schema pays off — the error fields copy straight across. Real rows carry
+no ground-truth label and no risk score, both recorded on the row rather than guessed,
+and both excluded from the metrics that would otherwise silently misreport them.
+
+**Robustness finding, from the quota exhaustion above.** A rate-limited provider turned
+a ~10s batch into **2m49s** of invisible SDK backoff — the SDKs honour a 429's
+retry-after and keep going, so the pipeline appears to hang rather than fail. Every
+provider client now has a bounded timeout and retry cap. Measured against the same
+genuinely quota-exhausted key: **2m49s → 35s**. Failing fast is correct here, since the
+classifier's fail-closed path already turns an error into a safe escalation.
+
+**Also in this pass:** CI (`.github/workflows/ci.yml`) running the backend suite plus
+frontend typecheck/lint/build on every push; tests asserting the three parallel policy
+tables stay aligned and that no hard decline is ever assigned a retry; a corrected
+`safety_monitor` docstring (it credited autoflush for the double-override dedup, but
+`SessionLocal` disables autoflush — the guard actually holds because `audit.log_event`
+commits each override as it is written); and a `StaticPool` fix in the test fixture,
+without which a TestClient-driven test writes to a different in-memory database than it
+asserts against.
+
+**Backend: 93 tests passing** (was 44).
+
+**Deliberately not done:** self-consistency on the LLM path (sampling the classification
+more than once and using inter-run agreement instead of the model's self-reported
+confidence, a substantially stronger failure signal). This remains the single largest
+known gap and is called out as such in the README.
+
+**Metrics need re-freezing.** The `seed=42` run recorded in the README was made while
+the provider quota was exhausted, so it reflects a degraded classifier. Re-run and
+re-freeze before the pitch video.
+
+---
+
 ## Phase 7 — Hardening & submission prep (Days 13-15)
 
 Build:
@@ -198,6 +293,10 @@ Build:
 - `backend/app/services/llm/` (`base.py`, `anthropic_provider.py`, `openai_provider.py`, `gemini_provider.py`, `sarvam_provider.py`, `__init__.py`)
 - `backend/app/services/safety_monitor.py`
 - `backend/app/services/executor.py`
+- `backend/app/services/retry_scheduler.py` (when a scheduled attempt lands)
+- `backend/app/services/notifier.py` (customer copy + content guard)
+- `backend/app/services/metrics.py` (batch metrics + classifier grading/calibration)
+- `backend/app/services/ingest.py`, `backend/app/routers/webhooks.py` (real webhook ingestion)
 - `backend/app/pipeline.py`
 - `backend/app/config.py` (every threshold, including the network compliance ceiling and the real-execution settings)
 - `backend/app/services/execution/` (`razorpay_client.py`, `harness.py`, `browser_driver.py`, `__init__.py`) — the real Razorpay test-mode integration, off by default
@@ -205,3 +304,4 @@ Build:
 - `backend/app/models.py`
 - `backend/Dockerfile` (Playwright's own base image, not `python:3.12-slim`)
 - `docker-compose.yml`
+- `.github/workflows/ci.yml`
