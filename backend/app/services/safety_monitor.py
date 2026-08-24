@@ -129,10 +129,14 @@ def check_after_action(db: Session, payment: FailedPayment) -> bool:
     the first already changed `payment`'s status -- they match different
     candidate sets, so skipping the second would leave a genuinely distinct
     signal (a different instrument sharing this IP) unevaluated. A row
-    matching both checks in the same call is only overridden once: the
-    Session's default autoflush means the IP check's query sees the
-    instrument check's pending status update, so its own per-row
-    "already blocked" guard skips it -- no extra dedup code needed.
+    matching both checks in the same call is only overridden once: each
+    override's audit.log_event commits as it is written, so by the time the
+    IP check queries, the instrument check's status change is already
+    durable and its own per-row "already blocked" guard skips it -- no extra
+    dedup code needed. (Note this does not depend on autoflush, which
+    db.SessionLocal disables; the commit inside log_event is what makes it
+    hold. The trailing db.commit() below is a no-op in that case and exists
+    for the path where nothing was logged.)
     """
     instrument_overridden = _check_instrument_velocity(db, payment)
     ip_overridden = _check_ip_velocity(db, payment)
